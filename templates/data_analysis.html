@@ -1,0 +1,975 @@
+{% extends "base.html" %}
+
+{% block title %}數據分析 - {{ child.nickname }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-chart-line text-primary me-2"></i>
+                    {{ child.nickname }} 的學習數據分析
+                </h2>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>返回學習中心
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 統計概覽 -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="stats-card">
+                <i class="fas fa-calendar-check"></i>
+                <h4>{{ study_sessions|length }}</h4>
+                <p class="mb-0">總學習次數</p>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stats-card">
+                <i class="fas fa-clock"></i>
+                <h4>
+                    {% set total_minutes = study_sessions | map(attribute='duration_minutes') | sum %}
+                    {{ "%.1f" | format(total_minutes / 60) }}
+                </h4>
+                <p class="mb-0">總學習時數</p>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stats-card">
+                <i class="fas fa-brain"></i>
+                <h4>
+                    {% if study_sessions %}
+                        {% set attention_sessions = study_sessions | selectattr('avg_attention') | list %}
+                        {% if attention_sessions %}
+                            {{ "%.0f" | format((attention_sessions | map(attribute='avg_attention') | sum / attention_sessions|length) * 100 / 3) }}%
+                        {% else %}
+                            --
+                        {% endif %}
+                    {% else %}
+                        --
+                    {% endif %}
+                </h4>
+                <p class="mb-0">平均專注度</p>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stats-card">
+                <i class="fas fa-trophy"></i>
+                <h4>
+                    {% if chart_data.subjects %}
+                        {{ chart_data.subjects[0] }}
+                    {% else %}
+                        --
+                    {% endif %}
+                </h4>
+                <p class="mb-0">最常學習科目</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 圖表區域 (2x2 格子) -->
+    <div class="row mb-4">
+        <!-- 左上：科目學習時間分布 -->
+        <div class="col-lg-6 mb-3">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie text-primary me-2"></i>
+                        科目學習時間分布
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="subjectTimeChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右上：科目專注度比較 -->
+        <div class="col-lg-6 mb-3">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar text-success me-2"></i>
+                        科目專注度比較
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="subjectAttentionChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 左下：學習日曆 -->
+        <div class="col-lg-6 mb-3">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-alt text-warning me-2"></i>
+                        學習日曆
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="calendar-container">
+                        <div class="calendar-header">
+                            <button class="calendar-nav" id="prevMonth">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <h6 id="currentMonth" class="mb-0"></h6>
+                            <button class="calendar-nav" id="nextMonth">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="calendar-grid" id="calendarGrid">
+                            <!-- 日曆將由 JavaScript 動態生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右下：專注度趨勢圖 -->
+        <div class="col-lg-6 mb-3">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line text-info me-2"></i>
+                        最近10次專注度趨勢
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="attentionTrendChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 詳細學習記錄 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history text-warning me-2"></i>
+                        詳細學習記錄
+                    </h5>
+                    <button class="btn btn-danger btn-sm" onclick="resetLearningHistory()">
+                        <i class="fas fa-redo me-1"></i>重置所有記錄
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>日期時間</th>
+                                    <th>科目</th>
+                                    <th>學習時長</th>
+                                    <th>平均專注度</th>
+                                    <th>狀態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for session in study_sessions %}
+                                <tr>
+                                    <td>{{ session.start_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">
+                                            {{ {'math': '數學', 'science': '自然科學', 'language': '語言文學', 
+                                                'social': '社會科學', 'art': '藝術創作', 'cs': '電腦科學'}[session.subject] }}
+                                        </span>
+                                    </td>
+                                    <td>{{ session.duration_minutes }} 分鐘</td>
+                                    <td>
+                                        {% if session.avg_attention %}
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar 
+                                                    {% if session.avg_attention >= 2.5 %}bg-success
+                                                    {% elif session.avg_attention >= 1.5 %}bg-warning
+                                                    {% else %}bg-danger{% endif %}" 
+                                                    style="width: {{ (session.avg_attention / 3 * 100) }}%">
+                                                    {{ "%.0f" | format(session.avg_attention * 100 / 3) }}%
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">--</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if session.end_time %}
+                                            <span class="badge bg-success">已完成</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">進行中</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm" 
+                                                onclick="deleteStudySession({{ session.id }})"
+                                                title="刪除此次學習記錄">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 確認重置模態框 -->
+<div class="modal fade" id="confirmResetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">確認重置學習記錄</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>確定要重置 {{ child.nickname }} 的所有學習記錄嗎？此操作無法復原。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" onclick="confirmReset()">確認重置</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 日曆詳情模態框 -->
+<div class="modal fade" id="calendarDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="calendarModalTitle">學習詳情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="calendarModalBody">
+                <!-- 學習詳情將由 JavaScript 動態填入 -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// 日曆相關變數
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth();
+let calendarData = {};
+
+// 圖表數據
+const chartData = {{ chart_data | tojson }};
+
+// 設定圖表預設字體大小
+Chart.defaults.font.size = 11;
+
+// 初始化日曆
+document.addEventListener('DOMContentLoaded', function() {
+    initCalendar();
+    loadCalendarData();
+    
+    // 日曆導航事件
+    document.getElementById('prevMonth').addEventListener('click', () => {
+        currentMonth--;
+        if (currentMonth < 0) {
+            currentMonth = 11;
+            currentYear--;
+        }
+        loadCalendarData();
+    });
+    
+    document.getElementById('nextMonth').addEventListener('click', () => {
+        currentMonth++;
+        if (currentMonth > 11) {
+            currentMonth = 0;
+            currentYear++;
+        }
+        loadCalendarData();
+    });
+});
+
+// 初始化日曆
+function initCalendar() {
+    const monthNames = [
+        '一月', '二月', '三月', '四月', '五月', '六月',
+        '七月', '八月', '九月', '十月', '十一月', '十二月'
+    ];
+    
+    const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+    
+    // 更新月份標題
+    document.getElementById('currentMonth').textContent = 
+        `${currentYear}年 ${monthNames[currentMonth]}`;
+    
+    // 創建日曆網格
+    const calendarGrid = document.getElementById('calendarGrid');
+    calendarGrid.innerHTML = '';
+    
+    // 添加星期標題
+    dayNames.forEach(day => {
+        const dayHeader = document.createElement('div');
+        dayHeader.className = 'calendar-day-header';
+        dayHeader.textContent = day;
+        calendarGrid.appendChild(dayHeader);
+    });
+    
+    // 計算月份資訊
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    // 計算需要顯示多少週
+    const totalDays = startingDayOfWeek + daysInMonth;
+    const totalWeeks = Math.ceil(totalDays / 7);
+    const totalCells = totalWeeks * 7;
+    
+    // 添加上個月的日期
+    const prevMonthLastDay = new Date(currentYear, currentMonth, 0).getDate();
+    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+        const dayElement = createDayElement(prevMonthLastDay - i, true, 'prev');
+        calendarGrid.appendChild(dayElement);
+    }
+    
+    // 添加當月日期
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayElement = createDayElement(day, false, 'current');
+        calendarGrid.appendChild(dayElement);
+    }
+    
+    // 添加下個月的日期
+    const remainingCells = totalCells - (startingDayOfWeek + daysInMonth);
+    for (let day = 1; day <= remainingCells; day++) {
+        const dayElement = createDayElement(day, true, 'next');
+        calendarGrid.appendChild(dayElement);
+    }
+}
+
+// 創建日期元素
+function createDayElement(day, isOtherMonth, monthType) {
+    const dayElement = document.createElement('div');
+    dayElement.className = 'calendar-day';
+    if (isOtherMonth) {
+        dayElement.classList.add('other-month');
+    }
+    
+    const dayNumber = document.createElement('div');
+    dayNumber.className = 'calendar-day-number';
+    dayNumber.textContent = day;
+    dayElement.appendChild(dayNumber);
+    
+    if (!isOtherMonth) {
+        const dateKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        dayElement.setAttribute('data-date', dateKey);
+        
+        dayElement.addEventListener('click', () => {
+            if (calendarData[dateKey]) {
+                showCalendarDetail(dateKey, calendarData[dateKey].sessions);
+            }
+        });
+    }
+    
+    return dayElement;
+}
+
+// 載入日曆數據
+async function loadCalendarData() {
+    try {
+        const response = await fetch(`/get_calendar_data?year=${currentYear}&month=${currentMonth + 1}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            calendarData = result.data;
+            initCalendar(); // 重新初始化日曆
+            updateCalendarView();
+        }
+    } catch (error) {
+        console.error('載入日曆數據失敗:', error);
+        initCalendar(); // 即使失敗也要顯示日曆
+    }
+}
+
+// 更新日曆視圖
+function updateCalendarView() {
+    Object.keys(calendarData).forEach(dateKey => {
+        const dayElement = document.querySelector(`[data-date="${dateKey}"]`);
+        if (dayElement) {
+            const data = calendarData[dateKey];
+            dayElement.classList.add('has-data');
+            dayElement.style.backgroundColor = data.color;
+            dayElement.style.color = '#fff';
+            dayElement.style.fontWeight = 'bold';
+            
+            // 添加工具提示
+            dayElement.title = `最佳科目：${data.best_subject}`;
+        }
+    });
+}
+
+// 顯示日曆詳情
+function showCalendarDetail(date, sessions) {
+    const modal = new bootstrap.Modal(document.getElementById('calendarDetailModal'));
+    const title = document.getElementById('calendarModalTitle');
+    const body = document.getElementById('calendarModalBody');
+    
+    title.textContent = `${date} 學習記錄`;
+    
+    let content = '';
+    sessions.forEach(session => {
+        const attentionPercent = session.avg_attention ? Math.round(session.avg_attention * 100 / 3) : 0;
+        content += `
+            <div class="study-session-item">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">${session.subject}</h6>
+                    <small class="text-muted">${session.start_time}</small>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <small class="text-muted">學習時長</small>
+                        <div>${session.duration_minutes} 分鐘</div>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">專注度</small>
+                        <div>${attentionPercent}%</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    body.innerHTML = content;
+    modal.show();
+}
+
+// 刪除學習記錄函數
+async function deleteStudySession(sessionId) {
+    if (!confirm('確定要刪除這次學習記錄嗎？')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/delete_session/${sessionId}`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            window.location.reload();
+        } else {
+            alert('刪除失敗：' + result.message);
+        }
+    } catch (error) {
+        alert('刪除失敗，請稍後再試');
+    }
+}
+
+// 科目學習時間分布圖
+if (chartData.subjects && chartData.subjects.length > 0) {
+    const subjectTimeCtx = document.getElementById('subjectTimeChart').getContext('2d');
+    new Chart(subjectTimeCtx, {
+        type: 'pie',
+        data: {
+            labels: chartData.subjects,
+            datasets: [{
+                data: chartData.study_times,
+                backgroundColor: [
+                    '#42a5f5',
+                    '#66bb6a',
+                    '#ef5350',
+                    '#ffb74d',
+                    '#ab47bc',
+                    '#26c6da'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 12,
+                        font: {
+                            size: 11
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.parsed + ' 分鐘';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 科目專注度比較圖
+if (chartData.subjects && chartData.subjects.length > 0) {
+    const subjectAttentionCtx = document.getElementById('subjectAttentionChart').getContext('2d');
+    new Chart(subjectAttentionCtx, {
+        type: 'bar',
+        data: {
+            labels: chartData.subjects,
+            datasets: [{
+                label: '平均專注度 (%)',
+                data: chartData.attention_scores,
+                backgroundColor: chartData.attention_scores.map(score => {
+                    if (score >= 80) return '#66bb6a';
+                    if (score >= 60) return '#ffb74d';
+                    return '#ef5350';
+                }),
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return '專注度: ' + context.parsed.y + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 專注度趨勢圖
+if (chartData.dates && chartData.dates.length > 0) {
+    const attentionTrendCtx = document.getElementById('attentionTrendChart').getContext('2d');
+    new Chart(attentionTrendCtx, {
+        type: 'line',
+        data: {
+            labels: chartData.dates,
+            datasets: [{
+                label: '專注度 (%)',
+                data: chartData.attention_trend,
+                borderColor: '#42a5f5',
+                backgroundColor: 'rgba(66, 165, 245, 0.1)',
+                borderWidth: 3,
+                pointRadius: 4,
+                pointBackgroundColor: '#42a5f5',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return '專注度: ' + context.parsed.y + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 重置學習記錄
+function resetLearningHistory() {
+    const modal = new bootstrap.Modal(document.getElementById('confirmResetModal'));
+    modal.show();
+}
+
+async function confirmReset() {
+    try {
+        const response = await fetch(`/reset_learning_history/{{ child.id }}`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('學習記錄已重置');
+            window.location.reload();
+        } else {
+            alert('重置失敗');
+        }
+    } catch (error) {
+        alert('重置失敗，請稍後再試');
+    }
+}
+</script>
+
+<style>
+/* 統計卡片樣式 */
+.stats-card {
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    transition: transform 0.3s ease;
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    color: #1976d2;
+    border: 1px solid rgba(66, 165, 245, 0.2);
+}
+
+.stats-card:hover {
+    transform: translateY(-3px);
+}
+
+.stats-card i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.9;
+}
+
+.stats-card h4 {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+
+.stats-card p {
+    font-size: 0.9rem;
+}
+
+/* 圖表卡片統一高度 */
+.chart-card {
+    height: 380px;
+}
+
+.chart-card .card-body {
+    padding: 1rem;
+    height: calc(100% - 60px);
+}
+
+/* 日曆樣式 - 確保顯示所有日期 */
+.calendar-container {
+    background: white;
+    border-radius: 6px;
+    padding: 0.5rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+}
+
+.calendar-header h6 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+}
+
+.calendar-nav {
+    background: none;
+    border: none;
+    font-size: 0.85rem;
+    color: #42a5f5;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.calendar-nav:hover {
+    background: #e3f2fd;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    flex: 1;
+    align-content: start;
+    grid-auto-rows: 1fr;
+    max-height: 100%;
+}
+
+.calendar-day-header {
+    text-align: center;
+    font-weight: 600;
+    color: #666;
+    padding: 0.2rem 0;
+    font-size: 0.7rem;
+    background: #f8f9fa;
+    border-radius: 2px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.calendar-day {
+    aspect-ratio: unset;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    position: relative;
+    border: 1px solid #f0f0f0;
+    background: white;
+    font-size: 0.75rem;
+}
+
+.calendar-day:hover {
+    background: #e3f2fd !important;
+    transform: scale(1.1);
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.calendar-day.has-data {
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    font-weight: 600;
+    border: none;
+}
+
+.calendar-day.other-month {
+    color: #ccc;
+    background: #fafafa;
+    opacity: 0.5;
+}
+
+.calendar-day-number {
+    font-weight: 500;
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+/* 確保日曆卡片有足夠高度 */
+.chart-card {
+    height: 380px;
+}
+
+.chart-card .card-body {
+    padding: 0.75rem;
+    height: calc(100% - 50px);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 日曆容器占滿剩餘空間 */
+.chart-card .calendar-container {
+    flex: 1;
+    min-height: 0;
+}
+
+/* 學習記錄項目樣式 */
+.study-session-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid #42a5f5;
+}
+
+.study-session-item:last-child {
+    margin-bottom: 0;
+}
+
+/* 圖表容器 */
+canvas {
+    max-height: 280px !important;
+    height: 280px !important;
+}
+
+/* 表格樣式 */
+.table-responsive {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+/* 響應式設計 */
+@media (max-width: 992px) {
+    .chart-card {
+        height: auto;
+        min-height: 350px;
+    }
+    
+    canvas {
+        max-height: 250px !important;
+        height: 250px !important;
+    }
+    
+    .calendar-container {
+        padding: 0.4rem;
+    }
+    
+    .calendar-day {
+        height: 26px;
+        font-size: 0.7rem;
+    }
+    
+    .calendar-day-header {
+        height: 22px;
+        font-size: 0.65rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-card {
+        padding: 1rem;
+    }
+    
+    .stats-card h4 {
+        font-size: 1.5rem;
+    }
+    
+    .stats-card i {
+        font-size: 1.5rem;
+    }
+    
+    .chart-card {
+        height: auto;
+        min-height: 320px;
+    }
+    
+    .calendar-grid {
+        gap: 0;
+    }
+    
+    .calendar-day {
+        height: 24px;
+        font-size: 0.65rem;
+        border-radius: 2px;
+    }
+    
+    .calendar-day-number {
+        font-size: 0.65rem;
+    }
+    
+    .calendar-day-header {
+        font-size: 0.6rem;
+        height: 20px;
+        padding: 0.1rem 0;
+    }
+    
+    .calendar-nav {
+        width: 24px;
+        height: 24px;
+        font-size: 0.75rem;
+        padding: 0.2rem;
+    }
+    
+    .calendar-header h6 {
+        font-size: 0.85rem;
+    }
+    
+    canvas {
+        max-height: 200px !important;
+        height: 200px !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .stats-card {
+        padding: 0.75rem;
+    }
+    
+    .stats-card h4 {
+        font-size: 1.25rem;
+    }
+    
+    .calendar-container {
+        padding: 0.3rem;
+    }
+    
+    .calendar-day {
+        height: 22px;
+        font-size: 0.6rem;
+    }
+    
+    .calendar-day-header {
+        padding: 0;
+        font-size: 0.55rem;
+        height: 18px;
+    }
+    
+    .calendar-header h6 {
+        font-size: 0.8rem;
+    }
+    
+    .calendar-header {
+        margin-bottom: 0.3rem;
+    }
+    
+    .chart-card {
+        min-height: 280px;
+    }
+    
+    .chart-card .card-body {
+        padding: 0.5rem;
+    }
+    
+    canvas {
+        max-height: 180px !important;
+        height: 180px !important;
+    }
+}
+</style>
+{% endblock %}

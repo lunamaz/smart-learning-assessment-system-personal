@@ -1,0 +1,36 @@
+[33mcommit 29513c6035a945f8bb28638b69a82380da15cf5c[m
+Author: 667788699 <N16131837@gs.ncku.edu.tw>
+Date:   Tue Jul 29 15:55:58 2025 +0800
+
+    Fix requirements.txt - keep all features, remove system packages
+    
+    - Remove Ubuntu system packages (cloud-init, python-apt, etc.)
+    - Remove NVIDIA CUDA packages (not needed on Render)
+    - Keep all Flask and chart functionality
+    - Add system dependencies for image processing
+    - Use compatible package versions for Python 3.13
+
+[33mcommit 49976b3e53e932f1e517396f29ba96c3fb328c50[m
+Author: 667788699 <N16131837@gs.ncku.edu.tw>
+Date:   Tue Jul 29 15:13:57 2025 +0800
+
+    Deploy with Python 3.13 compatibility
+    
+    - Remove runtime.txt to use Render's default Python 3.13
+    - Use Python 3.13 compatible packages only
+    - Temporarily remove matplotlib/numpy dependencies
+    - Keep all core functionality intact
+    - Basic PDF reports working
+    - Can add chart features later via frontend libraries
+
+[33mcommit 0b74b13c7672062b0b67e4115c72cf9e3fd7f9f2[m
+Author: 667788699 <N16131837@gs.ncku.edu.tw>
+Date:   Tue Jul 29 15:12:08 2025 +0800
+
+    Configure deployment for Python 3.10.12
+    
+    - Set Python 3.10.12 in runtime.txt
+    - Use Python 3.10 compatible package versions
+    - Add comprehensive system dependencies in aptfile
+    - Configure gunicorn with proper timeout and workers
+    - All application code remains unchanged

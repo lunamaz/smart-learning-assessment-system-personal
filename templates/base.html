@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}兒少智慧學習評估系統{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+    <style>
+        /* 確保文字清晰可見 - 淺色系 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "微軟正黑體", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #2c3e50;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #f8f9fc;
+        }
+        
+        /* 提升文字對比度 */
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+            color: #1976d2;
+        }
+        
+        .text-muted {
+            color: #546e7a !important;
+        }
+        
+        /* 導航列樣式優化 - 淺色系 */
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0,0,0,.08);
+            padding: 1rem 0;
+        }
+        
+        .navbar-brand {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        
+        /* 卡片樣式優化 */
+        .card {
+            border: 1px solid rgba(66, 165, 245, 0.125);
+            box-shadow: 0 2px 8px rgba(66, 165, 245, 0.08);
+        }
+        
+        /* 按鈕樣式優化 */
+        .btn {
+            font-weight: 500;
+            padding: 0.5rem 1.5rem;
+        }
+        
+        /* 表單控件優化 */
+        .form-control, .form-select {
+            font-size: 16px;
+            padding: 0.75rem 1rem;
+            border-color: #e3f2fd;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: #42a5f5;
+            box-shadow: 0 0 0 0.2rem rgba(66, 165, 245, 0.15);
+        }
+        
+        /* 進度條樣式 */
+        .progress {
+            height: 22px;
+            font-size: 14px;
+            font-weight: 600;
+            background-color: rgba(66, 165, 245, 0.1);
+        }
+        
+        .progress-bar {
+            line-height: 22px;
+        }
+        
+        /* 自定義顏色變數 */
+        :root {
+            --primary-color: #42a5f5;
+            --primary-dark: #1e88e5;
+            --success-color: #66bb6a;
+            --warning-color: #ffb74d;
+            --danger-color: #ef5350;
+            --info-color: #26c6da;
+        }
+        
+        /* 個人資料表單對齊 */
+        .modal-body .form-label {
+            min-width: 120px;
+            text-align: right;
+            margin-right: 10px;
+        }
+        
+        .modal-body .form-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .modal-body .form-group .form-control,
+        .modal-body .form-group .form-select,
+        .modal-body .form-group .btn-group {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-brain me-2"></i>智慧學習評估系統
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="navbar-nav ms-auto">
+                    {% if session.username %}
+                        {% if session.child_nickname %}
+                            <span class="navbar-text me-3">
+                                <i class="fas fa-user-graduate me-1 text-primary"></i>{{ session.child_nickname }}
+                            </span>
+                            <a class="nav-link text-primary" href="{{ url_for('dashboard') }}">
+                                <i class="fas fa-home me-1"></i>學習中心
+                            </a>
+                        {% endif %}
+                        <div class="dropdown">
+                            <a class="nav-link dropdown-toggle text-primary" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user me-1"></i>{{ session.username }}
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                                    <i class="fas fa-edit me-2"></i>編輯個人資料
+                                </a></li>
+                                {% if session.child_nickname %}
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editChildModal">
+                                    <i class="fas fa-child me-2"></i>編輯小孩資料
+                                </a></li>
+                                {% endif %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                    <i class="fas fa-sign-out-alt me-2"></i>登出
+                                </a></li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <a class="nav-link text-primary" href="{{ url_for('login') }}">
+                            <i class="fas fa-sign-in-alt me-1"></i>登入
+                        </a>
+                        <a class="nav-link text-primary" href="{{ url_for('register') }}">
+                            <i class="fas fa-user-plus me-1"></i>註冊
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-fluid py-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- 編輯個人資料模態框 -->
+    {% if session.username %}
+    <div class="modal fade" id="editProfileModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">編輯個人資料</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editProfileForm">
+                        <div class="form-group">
+                            <label for="editUsername" class="form-label">使用者名稱</label>
+                            <input type="text" class="form-control" id="editUsername" value="{{ session.username }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editEmail" class="form-label">電子郵件</label>
+                            <input type="email" class="form-control" id="editEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editPassword" class="form-label">新密碼</label>
+                            <input type="password" class="form-control" id="editPassword" placeholder="留空表示不更改">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="updateProfile()">更新</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 編輯小孩資料模態框 -->
+    {% if session.child_nickname %}
+    <div class="modal fade" id="editChildModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">編輯小孩資料</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editChildForm">
+                        <div class="form-group">
+                            <label for="editChildNickname" class="form-label">暱稱</label>
+                            <input type="text" class="form-control" id="editChildNickname" value="{{ session.child_nickname }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">性別</label>
+                            <div class="btn-group" role="group">
+                                <input type="radio" class="btn-check" name="editGender" id="editMale" value="male">
+                                <label class="btn btn-outline-primary" for="editMale">
+                                    <i class="fas fa-mars me-1"></i>男生
+                                </label>
+                                <input type="radio" class="btn-check" name="editGender" id="editFemale" value="female">
+                                <label class="btn btn-outline-danger" for="editFemale">
+                                    <i class="fas fa-venus me-1"></i>女生
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="editChildAge" class="form-label">年齡</label>
+                            <input type="number" class="form-control" id="editChildAge" min="6" max="18" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editEducationStage" class="form-label">教育階段</label>
+                            <select class="form-select" id="editEducationStage" required>
+                                <option value="elementary">國小</option>
+                                <option value="middle">國中</option>
+                                <option value="high">高中</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="updateChildProfile()">更新</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
+    <!-- 個人資料編輯相關JavaScript -->
+    {% if session.username %}
+    <script>
+    // 更新個人資料
+    async function updateProfile() {
+        const username = document.getElementById('editUsername').value;
+        const email = document.getElementById('editEmail').value;
+        const password = document.getElementById('editPassword').value;
+        
+        try {
+            const response = await fetch('/update_user_profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    password: password || null
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('個人資料更新成功！');
+                location.reload();
+            } else {
+                alert('更新失敗：' + result.message);
+            }
+        } catch (error) {
+            alert('更新失敗，請稍後再試');
+        }
+    }
+
+    {% if session.child_nickname %}
+    // 更新小孩資料
+    async function updateChildProfile() {
+        const nickname = document.getElementById('editChildNickname').value;
+        const gender = document.querySelector('input[name="editGender"]:checked').value;
+        const age = parseInt(document.getElementById('editChildAge').value);
+        const educationStage = document.getElementById('editEducationStage').value;
+        
+        if (age < 6 || age > 18) {
+            alert('年齡必須在6-18歲之間');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/update_child_profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    child_id: {{ session.child_id }},
+                    nickname: nickname,
+                    gender: gender,
+                    age: age,
+                    education_stage: educationStage
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('小孩資料更新成功！');
+                location.reload();
+            } else {
+                alert('更新失敗：' + result.message);
+            }
+        } catch (error) {
+            alert('更新失敗，請稍後再試');
+        }
+    }
+
+    // 年齡輸入驗證 - 修正只驗證範圍
+    document.addEventListener('DOMContentLoaded', function() {
+        const ageInput = document.getElementById('editChildAge');
+        if (ageInput) {
+            ageInput.addEventListener('blur', function() {
+                const age = parseInt(this.value);
+                if (isNaN(age) || age < 6 || age > 18) {
+                    this.setCustomValidity('年齡必須在6-18歲之間');
+                    this.reportValidity();
+                } else {
+                    this.setCustomValidity('');
+                }
+            });
+            
+            // 防止輸入非數字
+            ageInput.addEventListener('keypress', function(e) {
+                // 允許退格鍵、刪除鍵等控制鍵
+                if (e.which === 8 || e.which === 0) return;
+                
+                // 只允許數字
+                if (e.which < 48 || e.which > 57) {
+                    e.preventDefault();
+                }
+            });
+        }
+    });
+    {% endif %}
+    </script>
+    {% endif %}
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

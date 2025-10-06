@@ -1,0 +1,284 @@
+<!-- templates/register.html -->
+{% extends "base.html" %}
+
+{% block title %}註冊 - 智慧學習評估系統{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">
+                    <i class="fas fa-user-plus text-primary me-2"></i>建立新帳號
+                </h3>
+                
+                <form id="registerForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">使用者名稱</label>
+                        <input type="text" class="form-control" id="username" required minlength="3" maxlength="20">
+                        <div class="form-text">3-20個字元</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">電子郵件</label>
+                        <input type="email" class="form-control" id="email" required>
+                        <div class="form-text">請輸入有效的電子郵件地址</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">密碼</label>
+                        <input type="password" class="form-control" id="password" required minlength="6">
+                        <div class="form-text">至少6個字元</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="confirmPassword" class="form-label">確認密碼</label>
+                        <input type="password" class="form-control" id="confirmPassword" required>
+                        <div class="invalid-feedback" id="passwordMismatch" style="display: none;">
+                            密碼不一致
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="registerBtn">
+                            <i class="fas fa-user-plus me-2"></i>註冊
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="text-center mt-3">
+                    <p>已有帳號？<a href="{{ url_for('login') }}" class="text-decoration-none">立即登入</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 訊息模態框 -->
+<div class="modal fade" id="messageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">系統訊息</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="modalMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">確定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const registerForm = document.getElementById('registerForm');
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const passwordMismatch = document.getElementById('passwordMismatch');
+    const registerBtn = document.getElementById('registerBtn');
+
+    // 密碼確認即時驗證
+    function validatePasswordMatch() {
+        if (confirmPasswordInput.value && passwordInput.value !== confirmPasswordInput.value) {
+            confirmPasswordInput.classList.add('is-invalid');
+            passwordMismatch.style.display = 'block';
+            return false;
+        } else {
+            confirmPasswordInput.classList.remove('is-invalid');
+            passwordMismatch.style.display = 'none';
+            return true;
+        }
+    }
+
+    confirmPasswordInput.addEventListener('input', validatePasswordMatch);
+    passwordInput.addEventListener('input', validatePasswordMatch);
+
+    // 表單提交處理
+    registerForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // 獲取表單數據
+        const username = document.getElementById('username').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        // 基本驗證
+        if (!username || !email || !password || !confirmPassword) {
+            showMessage('請填寫所有欄位', 'error');
+            return;
+        }
+
+        if (username.length < 3 || username.length > 20) {
+            showMessage('使用者名稱必須為3-20個字元', 'error');
+            return;
+        }
+
+        if (password.length < 6) {
+            showMessage('密碼至少需要6個字元', 'error');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            showMessage('密碼確認不一致', 'error');
+            return;
+        }
+
+        // 電子郵件格式驗證
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            showMessage('請輸入有效的電子郵件地址', 'error');
+            return;
+        }
+
+        // 禁用按鈕防止重複提交
+        registerBtn.disabled = true;
+        registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>註冊中...';
+
+        try {
+            const response = await fetch('/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    password: password
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('註冊成功！即將跳轉到登入頁面...', 'success');
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
+            } else {
+                showMessage(result.message || '註冊失敗，請稍後再試', 'error');
+            }
+
+        } catch (error) {
+            console.error('註冊錯誤:', error);
+            showMessage('網路錯誤，請檢查連線並稍後再試', 'error');
+        } finally {
+            // 重新啟用按鈕
+            registerBtn.disabled = false;
+            registerBtn.innerHTML = '<i class="fas fa-user-plus me-2"></i>註冊';
+        }
+    });
+
+    // 顯示訊息的函數
+    function showMessage(message, type = 'info') {
+        const modal = document.getElementById('messageModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        
+        // 設定標題和樣式
+        if (type === 'success') {
+            modalTitle.textContent = '註冊成功';
+            modalTitle.className = 'modal-title text-success';
+        } else if (type === 'error') {
+            modalTitle.textContent = '註冊失敗';
+            modalTitle.className = 'modal-title text-danger';
+        } else {
+            modalTitle.textContent = '系統訊息';
+            modalTitle.className = 'modal-title';
+        }
+        
+        modalMessage.textContent = message;
+        
+        const bootstrapModal = new bootstrap.Modal(modal);
+        bootstrapModal.show();
+    }
+
+    // 使函數全域可用
+    window.showMessage = showMessage;
+});
+</script>
+
+<style>
+.card {
+    border-radius: 15px;
+    border: none;
+}
+
+.card.shadow {
+    box-shadow: 0 4px 20px rgba(66, 165, 245, 0.15) !important;
+}
+
+.form-control {
+    border-radius: 8px;
+    border: 2px solid #e3f2fd;
+    padding: 12px 15px;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #42a5f5;
+    box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.1);
+}
+
+.form-control.is-invalid {
+    border-color: #ef5350;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #1976d2;
+    margin-bottom: 8px;
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, #42a5f5, #1e88e5);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(45deg, #1e88e5, #1565c0);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(66, 165, 245, 0.3);
+}
+
+.btn-primary:disabled {
+    background: #ccc;
+    transform: none;
+    box-shadow: none;
+}
+
+.form-text {
+    color: #666;
+    font-size: 0.875rem;
+}
+
+.invalid-feedback {
+    color: #ef5350;
+    font-size: 0.875rem;
+    margin-top: 5px;
+}
+
+a.text-decoration-none:hover {
+    text-decoration: underline !important;
+}
+
+/* 響應式設計 */
+@media (max-width: 576px) {
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .card-title {
+        font-size: 1.25rem;
+    }
+}
+</style>
+{% endblock %}
+        }

@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}{{ subject_name }} - {{ child.nickname }} 的學習{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row gx-3">
+    <!-- 左側：影片 + 相機 -->
+    <div class="col-lg-8">
+      <div class="card video-main-card mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h4 class="mb-0"><i class="fas fa-video text-primary me-2"></i>{{ child.nickname }} - {{ subject_name }} 學習檢測</h4>
+
+          <!-- ⑥ 下拉式選單：開始學習後才 enable -->
+          <div class="d-flex align-items-center gap-2">
+            <label for="videoSelect" class="mb-0 small text-muted">切換影片</label>
+            <select id="videoSelect" class="form-select form-select-sm" disabled style="min-width: 220px;"></select>
+          </div>
+        </div>
+
+        <div class="card-body video-card-body">
+
+          <!-- 課程影片（縮小） -->
+          <div id="courseBox" class="course-video-container mb-3" style="display:none;">
+            <h6 class="text-center mb-2">
+              <i class="fas fa-film me-2 text-primary"></i><span id="courseTitle"></span>
+            </h6>
+            <video id="courseVideo" controls class="course-video" playsinline>
+              <source id="courseSrc" src="" type="video/mp4">
+              您的瀏覽器不支援影片播放
+            </video>
+          </div>
+
+          <!-- 相機 + 右側 AI 就緒膠囊 -->
+          <div class="d-flex align-items-start justify-content-center gap-3 flex-wrap">
+            <div class="video-container">
+              <video id="video" autoplay muted playsinline></video>
+              <canvas id="canvas" width="300" height="300" style="display:none;"></canvas>
+            </div>
+
+            <!-- <div class="ai-ready-pill" id="aiReadyPill" style="display:none;">
+              <i class="fas fa-check-circle me-2"></i>AI 模型已就緒，可以開始學習
+            </div> -->
+            
+            <!-- 右側直欄：先 AI 就緒，下面放警告 -->
+            <div id="sideInfoColumn" class="side-info">
+              <div class="ai-ready-pill" id="aiReadyPill" style="display:none;">
+                <i class="fas fa-check-circle me-2"></i>AI 模型已就緒，可以開始學習
+              </div>
+
+              <div id="detectionWarning" class="alert alert-warning mt-2" style="display:none;">
+                <i class="fas fa-exclamation-triangle me-2"></i><span id="warningMessage"></span>
+              </div>
+            </div>
+          </div>
+
+          <div id="cameraStatus" class="alert alert-info mt-3">
+            <i class="fas fa-info-circle me-2"></i>正在啟動攝影機...
+          </div>
+
+          <!-- <div id="detectionWarning" class="alert alert-warning mt-3" style="display:none;">
+            <i class="fas fa-exclamation-triangle me-2"></i><span id="warningMessage"></span>
+          </div> -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 右側：學習狀態（把按鈕放這裡） -->
+    <div class="col-lg-4 right-panel">
+      <div class="card mb-3 control-card" id="statusCard">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0"><i class="fas fa-tachometer-alt text-primary me-2"></i>學習狀態</h5>
+          <div class="d-flex gap-2">
+            <button id="startButton" class="btn btn-success btn-sm"><i class="fas fa-play me-1"></i>開始</button>
+            <button id="endButton" class="btn btn-danger btn-sm" disabled><i class="fas fa-stop me-1"></i>結束</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="mb-2 d-flex justify-content-between align-items-center">
+            <span>已學習</span><span id="elapsedText" class="badge bg-primary fs-6">00:00</span>
+          </div>
+          <div class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" id="pomodoroSwitch" checked>
+            <label class="form-check-label" for="pomodoroSwitch">每 25 分鐘提醒一次</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3 control-card compact-card" id="statsCard" style="display:none;">
+        <div class="card-header py-2"><h5 class="mb-0"><i class="fas fa-chart-line text-primary me-2"></i>即時統計</h5></div>
+        <div class="card-body py-2">
+          <div class="row text-center">
+            <div class="col-12 mb-1"><small class="text-muted">平均專注度</small><div id="avgAttention" class="h5 text-primary mb-0">0%</div></div>
+            <div class="col-6"><small class="text-muted">檢測次數</small><div id="detectionCount" class="h6 mb-0">0</div></div>
+            <div class="col-6"><small class="text-muted">有效檢測</small><div id="validDetections" class="h6 mb-0">0</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card control-card" id="emotionCard" style="display:none;">
+        <div class="card-header"><h5 class="mb-0"><i class="fas fa-smile text-warning me-2"></i>即時情緒分析</h5></div>
+        <div class="card-body emotion-card-body">
+          <div id="emotionLights" class="emotion-lights-container"></div>
+          <div class="mt-2">
+            <small class="text-muted d-flex align-items-center"><i class="fas fa-info-circle me-1"></i><span>中性＝專注；無表情＝分心</span></small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.right-panel{ background:#f8f9fc; min-height:100vh; padding:1rem; }
+.course-video-container{ max-width:640px; margin:0 auto; }
+.course-video{ width:100%; max-width:640px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,.1); border:3px solid #42a5f5; }
+.video-container{ position:relative; display:inline-block; border:4px solid #42a5f5; border-radius:15px; overflow:hidden; background:#000; box-shadow:0 8px 30px rgba(66,165,245,.3); }
+.video-container video{ display:block; width:360px; height:270px; object-fit:cover; }
+@media (min-width:1200px){ .video-container video{ width:420px; height:315px; } }
+@media (max-width:768px){ .course-video{ max-width:100%; } .video-container video{ width:100%; max-width:320px; height:auto; } }
+.video-main-card{ background:#f8f9fc; border:none; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+.video-card-body{ background:#f8f9fc; padding:1.2rem; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:540px; }
+.control-card{ background:#fff; border:none; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+.emotion-lights-container{ display:grid; grid-template-columns:repeat(auto-fit, minmax(80px,1fr)); gap:12px; padding:10px; }
+
+.ai-ready-pill{ white-space:nowrap; padding:10px 14px; border-radius:999px; background:#e8f5e9; color:#2e7d32; border:2px solid #a5d6a7; font-weight:600; display:flex; align-items:center; }
+#cameraStatus.alert-info, #cameraStatus.alert-success, #cameraStatus.alert-danger{ max-width:600px; margin:0 auto; }
+</style>
+
+<script>
+const SUBJECT='{{ subject }}';
+const DASHBOARD_URL='{{ url_for("dashboard") }}';
+let SESSION_ID=null, WATCH_ID=null;
+let POMODORO_ON=true, pomodoroTimer=null, pomodoroMins=25;
+let elapsedTimer=null, startedAt=null;
+let videos = [];
+
+// === 相機 ===
+async function openCamera(){
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
+    const videoEl = document.getElementById('video');
+    videoEl.srcObject = stream;
+    document.getElementById('cameraStatus').className='alert alert-success mt-3';
+    document.getElementById('cameraStatus').innerHTML='<i class="fas fa-check-circle me-2"></i>攝影機已啟動';
+    document.getElementById('aiReadyPill').style.display='';
+  }catch(e){
+    document.getElementById('cameraStatus').className='alert alert-danger mt-3';
+    document.getElementById('cameraStatus').innerHTML='<i class="fas fa-times-circle me-2"></i>無法啟動攝影機：'+e.message;
+  }
+}
+
+// === 時間顯示 ===
+function mmss(sec){ const m = Math.floor(sec/60).toString().padStart(2,'0'); const s = Math.floor(sec%60).toString().padStart(2,'0'); return `${m}:${s}`; }
+function startElapsed(){
+  startedAt = Date.now();
+  const label = document.getElementById('elapsedText');
+  elapsedTimer = setInterval(()=>{ label.textContent = mmss((Date.now()-startedAt)/1000); }, 1000);
+}
+function stopElapsed(){ if(elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer=null; } }
+
+// === 番茄鐘 ===
+function startPomodoro(){ stopPomodoro(); if(!POMODORO_ON) return;
+  pomodoroTimer = setTimeout(()=>{ alert('已學習 25 分鐘，要繼續嗎？'); startPomodoro(); }, pomodoroMins*60*1000);
+}
+function stopPomodoro(){ if(pomodoroTimer){ clearTimeout(pomodoroTimer); pomodoroTimer=null; } }
+
+// === 讀取影片清單（供下拉選） ===
+async function fetchVideos(){
+  const res = await fetch(`/api/videos/${SUBJECT}`);
+  const data = await res.json();
+  const sel = document.getElementById('videoSelect');
+  sel.innerHTML='';
+  videos = data.ok ? data.videos : [];
+  if(!data.ok || videos.length===0){
+    const opt = document.createElement('option');
+    opt.textContent = '目前沒有影片';
+    opt.disabled = true; opt.selected = true;
+    sel.appendChild(opt);
+    return;
+  }
+  for(const v of videos){
+    const opt = document.createElement('option');
+    opt.value = v.filename;
+    opt.textContent = v.display_name;
+    opt.dataset.url = v.url;
+    sel.appendChild(opt);
+  }
+}
+
+// === 切換影片（開始看 / 結束上支） ===
+async function startVideoBySelect(){
+  const sel = document.getElementById('videoSelect');
+  if(!SESSION_ID){ alert('請先點「開始」再選影片'); return; }
+  const opt = sel.options[sel.selectedIndex];
+  const filename = opt.value, displayName = opt.textContent, url = opt.dataset.url;
+
+  // 結束上一支
+  if(WATCH_ID){
+    try{ await fetch('/api/video/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watch_id:WATCH_ID})}); }catch(_){}
+    WATCH_ID=null;
+  }
+  // 通知後端開始看這支
+  const res = await fetch('/api/video/start',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ session_id: SESSION_ID, subject: SUBJECT,
+                           video_filename: filename, video_display_name: displayName })
+  });
+  const data = await res.json();
+  if(!data.ok){ alert('無法開始此影片'); return; }
+  WATCH_ID = data.watch_id;
+
+  // 設定播放器
+  const box = document.getElementById('courseBox');
+  const title = document.getElementById('courseTitle');
+  const src = document.getElementById('courseSrc');
+  const player = document.getElementById('courseVideo');
+  title.textContent = displayName; src.src = url; player.load(); box.style.display=''; player.play();
+  player.onended = async ()=>{ if(WATCH_ID){ try{ await fetch('/api/video/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watch_id:WATCH_ID})}); }catch(_){}
+                              WATCH_ID=null; } };
+}
+
+// === 開始 / 結束 一場學習 ===
+async function startSession(){
+  const res = await fetch('/api/session/start',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ subject: SUBJECT }) });
+  const data = await res.json();
+  if(!data.ok){ alert('無法開始學習：'+(data.error||'')); return; }
+  SESSION_ID = data.session_id;
+
+  // UI
+  document.getElementById('statsCard').style.display='';
+  document.getElementById('emotionCard').style.display='';
+  document.getElementById('startButton').disabled = true;
+  document.getElementById('endButton').disabled = false;
+  document.getElementById('videoSelect').disabled = false;
+
+  startElapsed(); startPomodoro();
+
+  // 如果下拉有值，預設開第一支
+  const sel = document.getElementById('videoSelect');
+  if(sel.options.length>0 && !sel.options[0].disabled){
+    sel.selectedIndex = 0;
+    await startVideoBySelect();
+  }
+
+  // ✅ 若你的情緒偵測起迴圈是寫在 script.js，這裡用事件觸發它
+  document.dispatchEvent(new Event('study-session-started'));
+}
+
+async function endSession(){
+  stopElapsed(); stopPomodoro();
+
+  if(WATCH_ID){
+    try{ await fetch('/api/video/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watch_id:WATCH_ID})}); }catch(_){}
+    WATCH_ID=null;
+  }
+  if(SESSION_ID){
+    try{ await fetch('/api/session/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:SESSION_ID})}); }catch(_){}
+    SESSION_ID=null;
+  }
+  document.dispatchEvent(new Event('study-session-ended'));    // ✅ 讓 script.js 停止偵測
+  // 回到儀表板
+  window.location.href = DASHBOARD_URL;
+}
+
+document.addEventListener('DOMContentLoaded', async ()=>{
+  openCamera();
+  await fetchVideos();
+
+  document.getElementById('startButton').addEventListener('click', startSession);
+  document.getElementById('endButton').addEventListener('click', endSession);
+  document.getElementById('videoSelect').addEventListener('change', startVideoBySelect);
+  document.getElementById('pomodoroSwitch').addEventListener('change', (e)=>{
+    POMODORO_ON = e.target.checked; if(POMODORO_ON) startPomodoro(); else stopPomodoro();
+  });
+});
+</script>
+{% endblock %}

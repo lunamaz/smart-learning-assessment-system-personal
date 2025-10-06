@@ -1,0 +1,16 @@
+pkg-config
+libfreetype6-dev
+libpng-dev
+libjpeg-dev
+libfontconfig1-dev
+libxrender1
+zlib1g-dev
+python3-dev
+build-essential
+libxml2-dev
+libxslt1-dev
+libssl-dev
+libffi-dev
+libcairo2-dev
+libgirepository1.0-dev
+libglib2.0-dev

@@ -1,0 +1,199 @@
+<!-- templates/login.html -->
+{% extends "base.html" %}
+
+{% block title %}登入 - 智慧學習評估系統{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">
+                    <i class="fas fa-sign-in-alt text-primary me-2"></i>登入系統
+                </h3>
+                
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">使用者名稱</label>
+                        <input type="text" class="form-control" id="username" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">密碼</label>
+                        <input type="password" class="form-control" id="password" required>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="loginBtn">
+                            <i class="fas fa-sign-in-alt me-2"></i>登入
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="text-center mt-3">
+                    <p>還沒有帳號？<a href="{{ url_for('register') }}" class="text-decoration-none">立即註冊</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 訊息模態框 -->
+<div class="modal fade" id="messageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">系統訊息</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="modalMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">確定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById('loginForm');
+    const loginBtn = document.getElementById('loginBtn');
+
+    loginForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+
+        if (!username || !password) {
+            showMessage('請輸入使用者名稱和密碼', 'error');
+            return;
+        }
+
+        // 禁用按鈕防止重複提交
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>登入中...';
+
+        try {
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('登入成功！即將跳轉...', 'success');
+                setTimeout(() => {
+                    window.location.href = '/child_selection';
+                }, 1500);
+            } else {
+                showMessage(result.message || '登入失敗，請檢查帳號密碼', 'error');
+            }
+
+        } catch (error) {
+            console.error('登入錯誤:', error);
+            showMessage('網路錯誤，請檢查連線並稍後再試', 'error');
+        } finally {
+            // 重新啟用按鈕
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>登入';
+        }
+    });
+
+    function showMessage(message, type = 'info') {
+        const modal = document.getElementById('messageModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        
+        if (type === 'success') {
+            modalTitle.textContent = '登入成功';
+            modalTitle.className = 'modal-title text-success';
+        } else if (type === 'error') {
+            modalTitle.textContent = '登入失敗';
+            modalTitle.className = 'modal-title text-danger';
+        } else {
+            modalTitle.textContent = '系統訊息';
+            modalTitle.className = 'modal-title';
+        }
+        
+        modalMessage.textContent = message;
+        
+        const bootstrapModal = new bootstrap.Modal(modal);
+        bootstrapModal.show();
+    }
+});
+</script>
+
+<style>
+.card {
+    border-radius: 15px;
+    border: none;
+}
+
+.card.shadow {
+    box-shadow: 0 4px 20px rgba(66, 165, 245, 0.15) !important;
+}
+
+.form-control {
+    border-radius: 8px;
+    border: 2px solid #e3f2fd;
+    padding: 12px 15px;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #42a5f5;
+    box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.1);
+}
+
+.form-label {
+    font-weight: 600;
+    color: #1976d2;
+    margin-bottom: 8px;
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, #42a5f5, #1e88e5);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(45deg, #1e88e5, #1565c0);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(66, 165, 245, 0.3);
+}
+
+.btn-primary:disabled {
+    background: #ccc;
+    transform: none;
+    box-shadow: none;
+}
+
+a.text-decoration-none:hover {
+    text-decoration: underline !important;
+}
+
+@media (max-width: 576px) {
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .card-title {
+        font-size: 1.25rem;
+    }
+}
+</style>
+{% endblock %}

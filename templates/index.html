@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero-section text-center py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <h1 class="display-4 mb-4 fw-bold">
+                    <i class="fas fa-graduation-cap text-warning me-3"></i>
+                    兒少智慧學習評估系統
+                </h1>
+                <p class="lead mb-5 fs-5">
+                    透過人工智慧技術即時分析學習專注度與情緒狀態，<br>
+                    為家長和老師提供個人化的學習建議與詳細分析報告
+                </p>
+                
+                {% if not session.username %}
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg me-md-2">
+                        <i class="fas fa-user-plus me-2"></i>立即註冊
+                    </a>
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-sign-in-alt me-2"></i>登入系統
+                    </a>
+                </div>
+                {% else %}
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    <a href="{{ url_for('child_selection') }}" class="btn btn-success btn-lg">
+                        <i class="fas fa-tachometer-alt me-2"></i>進入學習中心
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container my-5">
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 text-center feature-card">
+                <div class="card-body">
+                    <i class="fas fa-eye fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title fw-bold">即時檢測</h5>
+                    <p class="card-text">透過 AI 視覺技術，即時監測學習狀態並分析專注度變化</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <a href="#data-analysis-preview" class="text-decoration-none">
+                <div class="card h-100 text-center feature-card clickable">
+                    <div class="card-body">
+                        <i class="fas fa-chart-line fa-3x text-success mb-3"></i>
+                        <h5 class="card-title fw-bold">數據分析</h5>
+                        <p class="card-text">詳細記錄每堂課的學習表現，提供視覺化圖表與多維度數據分析</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4 mb-4">
+            <a href="#smart-suggestions-preview" class="text-decoration-none">
+                <div class="card h-100 text-center feature-card clickable">
+                    <div class="card-body">
+                        <i class="fas fa-lightbulb fa-3x text-warning mb-3"></i>
+                        <h5 class="card-title fw-bold">智慧建議</h5>
+                        <p class="card-text">基於年齡、性別、教育階段提供個人化學習策略建議</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 數據分析預覽 -->
+<div id="data-analysis-preview" class="bg-light py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">
+            <i class="fas fa-chart-line text-success me-2"></i>
+            數據分析功能展示
+        </h2>
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">多維度學習數據追蹤</h5>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>學習時長統計</li>
+                            <li><i class="fas fa-check text-success me-2"></i>專注度趨勢分析</li>
+                            <li><i class="fas fa-check text-success me-2"></i>科目表現比較</li>
+                            <li><i class="fas fa-check text-success me-2"></i>學習日曆檢視</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <canvas id="demo-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 智慧建議預覽 -->
+<div id="smart-suggestions-preview" class="py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">
+            <i class="fas fa-lightbulb text-warning me-2"></i>
+            智慧建議功能展示
+        </h2>
+        <div class="row">
+            <div class="col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">年齡適性建議</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>根據兒少的年齡階段，提供適合的學習時間長度、休息頻率和學習方式建議。</p>
+                        <small class="text-muted">
+                            <i class="fas fa-child me-1"></i>
+                            針對國小、國中、高中不同階段客製化
+                        </small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">學習風格分析</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>基於學習數據分析最適合的學習風格，包括視覺型、聽覺型或動覺型學習建議。</p>
+                        <small class="text-muted">
+                            <i class="fas fa-brain me-1"></i>
+                            AI 智慧分析個人學習特質
+                        </small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">進步追蹤報告</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>定期生成PDF報告，追蹤學習進步幅度，並提供具體的改善方向和學習策略。</p>
+                        <small class="text-muted">
+                            <i class="fas fa-file-pdf me-1"></i>
+                            可下載完整分析報告
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 系統特色 -->
+<div class="bg-light py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">系統特色</h2>
+        <div class="row justify-content-center">
+            <div class="col-md-6 mb-4">
+                <div class="d-flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-users fa-2x text-primary"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5>多檔案管理</h5>
+                        <p class="text-muted">支援最多4個小孩的學習檔案，每個檔案獨立記錄和分析</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="d-flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-shield-alt fa-2x text-success"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5>隱私保護</h5>
+                        <p class="text-muted">所有數據加密儲存，確保兒少學習資料的安全性</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="d-flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-robot fa-2x text-info"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5>AI 技術支援</h5>
+                        <p class="text-muted">採用先進的人臉檢測與深度學習情緒分類模型</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="d-flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-mobile-alt fa-2x text-warning"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5>跨平台支援</h5>
+                        <p class="text-muted">支援電腦、平板和手機，隨時隨地查看學習進度</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// 示範圖表
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('demo-chart');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['第1週', '第2週', '第3週', '第4週', '第5週', '第6週'],
+                datasets: [{
+                    label: '專注度趨勢',
+                    data: [65, 68, 72, 75, 78, 82],
+                    borderColor: '#42a5f5',
+                    backgroundColor: 'rgba(66, 165, 245, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

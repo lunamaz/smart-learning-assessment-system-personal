@@ -1,0 +1,1470 @@
+/* static/style.css */
+
+/* 全域樣式 - 淺色系配色 */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Microsoft JhengHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fc;
+    line-height: 1.6;
+    color: #2c3e50;
+}
+
+/* 導航列樣式 - 改為淺色 */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.3rem;
+    color: #1976d2 !important;
+}
+
+.navbar-nav .nav-link {
+    color: #1976d2 !important;
+    font-weight: 500;
+}
+
+.navbar-nav .nav-link:hover {
+    color: #0d47a1 !important;
+}
+
+.navbar-text {
+    color: #1976d2 !important;
+}
+
+/* 下拉選單樣式 */
+.dropdown-menu {
+    border: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    border-radius: 8px;
+}
+
+.dropdown-item {
+    color: #1976d2;
+    transition: all 0.3s ease;
+}
+
+.dropdown-item:hover {
+    background-color: #e3f2fd;
+    color: #0d47a1;
+}
+
+/* 首頁 Hero 區域 - 淺色漸層 */
+.hero-section {
+    background: linear-gradient(135deg, #e3f2fd 0%, #c8e6c9 100%);
+    color: #2c3e50;
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 100" preserveAspectRatio="none"><polygon fill="rgba(255,255,255,0.2)" points="1000,0 1000,100 0,100"/></svg>');
+    background-size: cover;
+}
+
+.hero-section .container {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-section .btn-outline-light {
+    border-color: #2c3e50;
+    color: #2c3e50;
+}
+
+.hero-section .btn-outline-light:hover {
+    background-color: #2c3e50;
+    color: white;
+}
+
+/* 卡片樣式 - 更淺的陰影 */
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background: linear-gradient(45deg, #42a5f5, #1e88e5);
+    color: white;
+    border-radius: 12px 12px 0 0 !important;
+    font-weight: 600;
+}
+
+/* 學科選擇卡片 */
+.subject-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    height: 100%;
+    border: 2px solid #e8f4f8;
+}
+
+.subject-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 25px rgba(66, 165, 245, 0.2);
+    border-color: #42a5f5;
+}
+
+.subject-card .card-body {
+    padding: 2rem;
+}
+
+.subject-icon {
+    transition: transform 0.3s ease;
+}
+
+.subject-card:hover .subject-icon {
+    transform: scale(1.1);
+}
+
+/* 專注度指示器 */
+.attention-indicator {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin: 20px 0;
+    padding: 20px;
+    background: rgba(66, 165, 245, 0.05);
+    border-radius: 15px;
+    border: 1px solid rgba(66, 165, 245, 0.1);
+}
+
+.attention-light {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: white;
+    transition: all 0.4s ease;
+    opacity: 0.3;
+    font-size: 0.9rem;
+    position: relative;
+    cursor: pointer;
+}
+
+.attention-light::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    right: -5px;
+    bottom: -5px;
+    border-radius: 50%;
+    background: inherit;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.attention-light:nth-child(1) {
+    background: linear-gradient(45deg, #ef5350, #f44336);
+}
+
+.attention-light:nth-child(2) {
+    background: linear-gradient(45deg, #ffb74d, #ff9800);
+}
+
+.attention-light:nth-child(3) {
+    background: linear-gradient(45deg, #66bb6a, #4caf50);
+}
+
+.attention-light.active {
+    opacity: 1;
+    transform: scale(1.2);
+    box-shadow: 0 0 25px rgba(255,255,255,0.8);
+    animation: pulse-glow 2s infinite;
+}
+
+.attention-light.active::before {
+    opacity: 0.3;
+    animation: ripple 2s infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% { 
+        transform: scale(1.2);
+        box-shadow: 0 0 25px rgba(255,255,255,0.8);
+    }
+    50% { 
+        transform: scale(1.3);
+        box-shadow: 0 0 35px rgba(255,255,255,0.9);
+    }
+}
+
+@keyframes ripple {
+    0% {
+        transform: scale(1);
+        opacity: 0.3;
+    }
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+}
+
+/* 攝影機區域 - 淺色邊框 */
+.video-container {
+    position: relative;
+    display: inline-block;
+    border: 4px solid #42a5f5;
+    border-radius: 15px;
+    overflow: hidden;
+    background: #000;
+    box-shadow: 0 6px 20px rgba(66, 165, 245, 0.3);
+}
+
+.video-container::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #42a5f5, #1e88e5, #42a5f5);
+    border-radius: 15px;
+    z-index: -1;
+    animation: border-glow 3s infinite;
+}
+
+@keyframes border-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+.video-container video {
+    display: block;
+    border-radius: 11px;
+    object-fit: cover;
+}
+
+/* 情緒燈光顯示 - 支援八種情緒（包含no_emotion） */
+#emotionLights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 15px;
+    padding: 15px;
+}
+
+.emotion-light-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    opacity: 0.3;
+    cursor: pointer;
+    position: relative;
+    border: 2px solid transparent;
+}
+
+.emotion-light-item i {
+    font-size: 2rem;
+    margin-bottom: 5px;
+    transition: all 0.3s ease;
+}
+
+.emotion-light-item .emotion-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    margin-top: 5px;
+}
+
+/* 各種情緒的顏色配置（包含no_emotion） */
+#emotion-neutral {
+    color: #2ECC71;
+}
+
+#emotion-neutral.active {
+    color: #2ECC71;
+    border-color: #2ECC71;
+    background-color: rgba(46, 204, 113, 0.1);
+}
+
+#emotion-happy {
+    color: #F39C12;
+}
+
+#emotion-happy.active {
+    color: #F39C12;
+    border-color: #F39C12;
+    background-color: rgba(243, 156, 18, 0.1);
+}
+
+#emotion-surprise {
+    color: #E74C3C;
+}
+
+#emotion-surprise.active {
+    color: #E74C3C;
+    border-color: #E74C3C;
+    background-color: rgba(231, 76, 60, 0.1);
+}
+
+#emotion-sad {
+    color: #3498DB;
+}
+
+#emotion-sad.active {
+    color: #3498DB;
+    border-color: #3498DB;
+    background-color: rgba(52, 152, 219, 0.1);
+}
+
+#emotion-fear {
+    color: #9B59B6;
+}
+
+#emotion-fear.active {
+    color: #9B59B6;
+    border-color: #9B59B6;
+    background-color: rgba(155, 89, 182, 0.1);
+}
+
+#emotion-anger {
+    color: #E74C3C;
+}
+
+#emotion-anger.active {
+    color: #E74C3C;
+    border-color: #E74C3C;
+    background-color: rgba(231, 76, 60, 0.1);
+}
+
+#emotion-disgust {
+    color: #8E44AD;
+}
+
+#emotion-disgust.active {
+    color: #8E44AD;
+    border-color: #8E44AD;
+    background-color: rgba(142, 68, 173, 0.1);
+}
+
+/* no_emotion 特殊樣式 - 警告狀態 */
+#emotion-no-emotion {
+    color: #95A5A6;
+    border: 2px dashed #95A5A6 !important;
+}
+
+#emotion-no-emotion.active {
+    color: #e74c3c;
+    border: 2px dashed #e74c3c !important;
+    background-color: rgba(231, 76, 60, 0.1);
+}
+
+.emotion-light-item.active {
+    opacity: 1;
+    transform: scale(1.05);
+    animation: emotionPulse 2s infinite;
+}
+
+.emotion-light-item.active i {
+    filter: drop-shadow(0 0 10px currentColor);
+    transform: scale(1.1);
+}
+
+@keyframes emotionPulse {
+    0%, 100% {
+        transform: scale(1.05);
+        box-shadow: 0 0 15px rgba(255,255,255,0.3);
+    }
+    50% {
+        transform: scale(1.1);
+        box-shadow: 0 0 25px rgba(255,255,255,0.5);
+    }
+}
+
+/* no_emotion 特殊閃爍動畫 */
+@keyframes notEmotionBlink {
+    0%, 50%, 100% {
+        opacity: 1;
+        border-color: #e74c3c;
+        color: #e74c3c;
+    }
+    25%, 75% {
+        opacity: 0.6;
+        border-color: #95A5A6;
+        color: #95A5A6;
+    }
+}
+
+/* no_emotion 閃爍時的特效 */
+#emotion-no-emotion.active {
+    animation: notEmotionBlink 1s infinite;
+}
+
+/* 情緒卡片增強樣式 */
+.emotion-card-body {
+    padding: 1rem;
+    background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+}
+
+.emotion-lights-container {
+    background: white;
+    border-radius: 10px;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* 確保視訊畫面與右側三個卡片總高度一致 */
+@media (min-width: 992px) {
+    .col-lg-8 .card-body {
+        min-height: 600px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+}
+
+/* 按鈕樣式 - 淺色系 */
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.5s;
+}
+
+.btn:hover::before {
+    left: 100%;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, #42a5f5, #1e88e5);
+    border: none;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(45deg, #1e88e5, #1565c0);
+}
+
+.btn-success {
+    background: linear-gradient(45deg, #66bb6a, #4caf50);
+    border: none;
+}
+
+.btn-success:hover {
+    background: linear-gradient(45deg, #4caf50, #388e3c);
+}
+
+.btn-danger {
+    background: linear-gradient(45deg, #ef5350, #f44336);
+    border: none;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(45deg, #f44336, #d32f2f);
+}
+
+.btn-warning {
+    background: linear-gradient(45deg, #ffb74d, #ff9800);
+    border: none;
+    color: white;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(45deg, #ff9800, #f57c00);
+    color: white;
+}
+
+.btn-info {
+    background: linear-gradient(45deg, #26c6da, #00bcd4);
+    border: none;
+}
+
+.btn-info:hover {
+    background: linear-gradient(45deg, #00bcd4, #0097a7);
+}
+
+.btn-lg {
+    padding: 12px 30px;
+    font-size: 1.1rem;
+}
+
+/* 進度條樣式 */
+.progress {
+    height: 8px;
+    border-radius: 10px;
+    background-color: rgba(66, 165, 245, 0.1);
+    overflow: hidden;
+}
+
+.progress-bar {
+    border-radius: 10px;
+    transition: width 1s ease-in-out;
+    background: linear-gradient(45deg, #42a5f5, #1e88e5);
+    position: relative;
+}
+
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,0.3),
+        transparent
+    );
+    animation: progress-shine 2s infinite;
+}
+
+@keyframes progress-shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* 警告提示 - 淺色系 */
+.alert {
+    border-radius: 10px;
+    border: none;
+    font-weight: 500;
+    position: relative;
+    overflow: hidden;
+}
+
+.alert::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: currentColor;
+}
+
+.alert-success {
+    background: linear-gradient(45deg, #e8f5e8, #c8e6c8);
+    color: #2e7d32;
+    border-left: 4px solid #4caf50;
+}
+
+.alert-danger {
+    background: linear-gradient(45deg, #ffebee, #ffcdd2);
+    color: #c62828;
+    border-left: 4px solid #f44336;
+}
+
+.alert-warning {
+    background: linear-gradient(45deg, #fff8e1, #ffecb3);
+    color: #ef6c00;
+    border-left: 4px solid #ff9800;
+}
+
+.alert-info {
+    background: linear-gradient(45deg, #e1f5fe, #b3e5fc);
+    color: #0277bd;
+    border-left: 4px solid #03a9f4;
+}
+
+/* 模態框樣式 */
+.modal-content {
+    border-radius: 15px;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    overflow: hidden;
+}
+
+.modal-header {
+    background: linear-gradient(45deg, #42a5f5, #1e88e5);
+    color: white;
+    border-bottom: none;
+}
+
+.modal-footer {
+    border-top: 1px solid rgba(66, 165, 245, 0.1);
+}
+
+/* 統計卡片 - 淺色漸層 */
+.stats-card {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    color: #1976d2;
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: transform 0.3s ease;
+    border: 1px solid rgba(66, 165, 245, 0.2);
+}
+
+.stats-card:hover {
+    transform: scale(1.05);
+}
+
+.stats-card i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.9;
+}
+
+.stats-card h4 {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+/* 表格樣式 */
+.table {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.table thead th {
+    background: linear-gradient(45deg, #42a5f5, #1e88e5);
+    color: white;
+    border: none;
+    font-weight: 600;
+}
+
+.table tbody tr {
+    transition: background-color 0.3s ease;
+}
+
+.table tbody tr:hover {
+    background-color: rgba(66, 165, 245, 0.05);
+}
+
+/* 徽章樣式 */
+.badge {
+    font-size: 0.9rem;
+    padding: 0.6em 1em;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.bg-primary {
+    background: linear-gradient(45deg, #42a5f5, #1e88e5) !important;
+}
+
+.bg-success {
+    background: linear-gradient(45deg, #66bb6a, #4caf50) !important;
+}
+
+.bg-danger {
+    background: linear-gradient(45deg, #ef5350, #f44336) !important;
+}
+
+.bg-warning {
+    background: linear-gradient(45deg, #ffb74d, #ff9800) !important;
+}
+
+.bg-info {
+    background: linear-gradient(45deg, #26c6da, #00bcd4) !important;
+}
+
+/* 載入動畫 */
+.loading {
+    display: inline-block;
+    width: 25px;
+    height: 25px;
+    border: 3px solid rgba(66, 165, 245, 0.3);
+    border-radius: 50%;
+    border-top-color: #42a5f5;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 表單樣式 */
+.form-control {
+    border-radius: 8px;
+    border: 2px solid #e3f2fd;
+    padding: 12px 15px;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #42a5f5;
+    box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.1);
+    transform: translateY(-2px);
+}
+
+.form-label {
+    font-weight: 600;
+    color: #1976d2;
+    margin-bottom: 8px;
+}
+
+/* 學習時間選擇器 */
+.time-selector {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.time-option {
+    flex: 1;
+    padding: 15px;
+    border: 2px solid #e3f2fd;
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.time-option:hover {
+    border-color: #42a5f5;
+    background: #f8f9fa;
+}
+
+.time-option.active {
+    border-color: #42a5f5;
+    background: #42a5f5;
+    color: white;
+}
+
+/* 功能卡片樣式 */
+.feature-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border: 2px solid transparent;
+    background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+}
+
+.feature-card.clickable {
+    cursor: pointer;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(66, 165, 245, 0.15);
+    border-color: #42a5f5;
+}
+
+.feature-card .card-title {
+    color: #1976d2;
+    font-weight: 600;
+}
+
+.feature-card:hover .card-title {
+    color: #0d47a1;
+}
+
+/* 小孩選擇卡片 */
+.child-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid #e3f2fd;
+    background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+}
+
+.child-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(66, 165, 245, 0.2);
+    border-color: #42a5f5;
+}
+
+.add-child-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px dashed #66bb6a;
+    background: linear-gradient(135deg, #f1f8e9 0%, #e8f5e8 100%);
+}
+
+.add-child-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(102, 187, 106, 0.2);
+    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c8 100%);
+}
+
+.child-avatar {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-radius: 50%;
+}
+
+/* 日曆樣式 - 修改為填滿空間 */
+.calendar-container {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-shrink: 0;
+}
+
+.calendar-header h6 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.calendar-nav {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    color: #42a5f5;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.calendar-nav:hover {
+    background: #e3f2fd;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    flex: 1;
+    align-content: start;
+}
+
+.calendar-day-header {
+    text-align: center;
+    font-weight: 600;
+    color: #666;
+    padding: 0.4rem;
+    font-size: 0.8rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    position: relative;
+    border: 1px solid #e0e0e0;
+    background: white;
+    font-size: 0.85rem;
+}
+
+.calendar-day:hover {
+    background: #e3f2fd !important;
+    transform: scale(1.05);
+}
+
+.calendar-day.has-data {
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.calendar-day.other-month {
+    color: #ccc;
+    background: #fafafa;
+}
+
+.calendar-day-number {
+    font-weight: 500;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+/* 學習記錄項目樣式 */
+.study-session-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid #42a5f5;
+}
+
+.study-session-item:last-child {
+    margin-bottom: 0;
+}
+
+/* 圖表容器 */
+canvas {
+    max-height: 280px !important;
+    height: 280px !important;
+}
+
+/* 表格樣式 */
+.table-responsive {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+/* 性能指標 */
+.performance-metric {
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 10px;
+    transition: transform 0.3s ease;
+    border: 1px solid rgba(66, 165, 245, 0.1);
+}
+
+.performance-metric:hover {
+    transform: translateY(-5px);
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+}
+
+/* 學習者資訊 */
+.learner-info {
+    font-size: 1.1rem;
+}
+
+.info-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(66, 165, 245, 0.1);
+    display: flex;
+    align-items: center;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-item i {
+    width: 25px;
+    text-align: center;
+    color: #42a5f5;
+}
+
+/* 建議卡片 */
+.suggestion-card {
+    height: 100%;
+    transition: transform 0.3s ease;
+}
+
+.suggestion-card:hover {
+    transform: translateY(-5px);
+}
+
+.suggestion-item {
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    line-height: 1.6;
+    border-left: 3px solid rgba(66, 165, 245, 0.3);
+}
+
+.suggestion-item:last-child {
+    margin-bottom: 0;
+}
+
+/* 響應式設計 */
+@media (max-width: 992px) {
+    .chart-card {
+        height: auto;
+        min-height: 350px;
+    }
+    
+    canvas {
+        max-height: 250px !important;
+        height: 250px !important;
+    }
+    
+    .emotion-light-item {
+        padding: 8px;
+    }
+    
+    .emotion-light-item i {
+        font-size: 1.5rem;
+    }
+    
+    .emotion-lights-container {
+        grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+        gap: 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-section {
+        min-height: 50vh;
+        padding: 2rem 0;
+    }
+    
+    .display-4 {
+        font-size: 2.2rem;
+    }
+    
+    .lead {
+        font-size: 1.1rem;
+    }
+    
+    .video-container {
+        width: 100%;
+        max-width: 300px;
+    }
+    
+    .video-container video {
+        width: 100%;
+        height: auto;
+    }
+    
+    .attention-light {
+        width: 50px;
+        height: 50px;
+        font-size: 0.8rem;
+    }
+    
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .btn-lg {
+        padding: 10px 25px;
+        font-size: 1rem;
+    }
+    
+    .time-selector {
+        flex-direction: column;
+    }
+    
+    .subject-card .card-body {
+        padding: 1.5rem;
+    }
+    
+    .attention-indicator {
+        padding: 15px;
+    }
+    
+    .calendar-grid {
+        gap: 1px;
+    }
+    
+    .calendar-day {
+        font-size: 0.75rem;
+    }
+    
+    .calendar-day-number {
+        font-size: 0.75rem;
+    }
+    
+    .stats-card {
+        padding: 1rem;
+    }
+    
+    .stats-card h4 {
+        font-size: 1.5rem;
+    }
+    
+    .stats-card i {
+        font-size: 1.5rem;
+    }
+    
+    .chart-card {
+        height: auto;
+        min-height: 300px;
+    }
+    
+    .calendar-nav {
+        width: 30px;
+        height: 30px;
+        font-size: 0.9rem;
+    }
+    
+    canvas {
+        max-height: 200px !important;
+        height: 200px !important;
+    }
+    
+    .performance-metric {
+        margin-bottom: 1rem;
+    }
+    
+    .suggestion-item {
+        padding: 0.75rem;
+        font-size: 0.95rem;
+    }
+    
+    .info-item {
+        font-size: 1rem;
+    }
+    
+    .col-md-6.mb-3 {
+        margin-bottom: 1rem !important;
+    }
+    
+    #emotionLights {
+        grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+        gap: 8px;
+        padding: 10px;
+    }
+    
+    .emotion-light-item i {
+        font-size: 1.5rem;
+    }
+    
+    .emotion-light-item .emotion-label {
+        font-size: 0.7rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .container-fluid {
+        padding: 0 10px;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .display-4 {
+        font-size: 1.8rem;
+    }
+    
+    .navbar-brand {
+        font-size: 1.1rem;
+    }
+    
+    .attention-light {
+        width: 45px;
+        height: 45px;
+        font-size: 0.7rem;
+    }
+    
+    .btn {
+        font-size: 0.9rem;
+    }
+    
+    .calendar-day {
+        font-size: 0.7rem;
+    }
+    
+    .stats-card {
+        padding: 0.75rem;
+    }
+    
+    .stats-card h4 {
+        font-size: 1.25rem;
+    }
+    
+    .chart-card .card-body {
+        padding: 0.75rem;
+    }
+    
+    canvas {
+        max-height: 180px !important;
+        height: 180px !important;
+    }
+    
+    .performance-metric h3 {
+        font-size: 1.5rem;
+    }
+    
+    .performance-metric i {
+        font-size: 1.5rem !important;
+    }
+    
+    .suggestion-item {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .card-header h5 {
+        font-size: 1rem;
+    }
+    
+    #emotionLights {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        padding: 8px;
+    }
+    
+    .emotion-light-item {
+        padding: 5px;
+    }
+    
+    .emotion-light-item i {
+        font-size: 1.2rem;
+    }
+    
+    .emotion-light-item .emotion-label {
+        font-size: 0.65rem;
+    }
+    
+    .video-container video {
+        width: 100%;
+        max-width: 400px;
+        height: auto;
+    }
+    
+    .calendar-day-header {
+        padding: 0.3rem;
+        font-size: 0.7rem;
+    }
+    
+    .calendar-header h6 {
+        font-size: 0.9rem;
+    }
+}
+
+/* 深色模式支援 */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #f8f9fc;
+        color: #2c3e50;
+    }
+    
+    .card {
+        background-color: white;
+        color: #2c3e50;
+    }
+    
+    .form-control {
+        background-color: white;
+        border-color: #e3f2fd;
+        color: #2c3e50;
+    }
+    
+    .form-control:focus {
+        background-color: white;
+        border-color: #42a5f5;
+    }
+    
+    .table {
+        color: #2c3e50;
+    }
+    
+    .table tbody tr:hover {
+        background-color: rgba(66, 165, 245, 0.05);
+    }
+    
+    .alert {
+        color: inherit;
+    }
+    
+    .modal-content {
+        background-color: white;
+        color: #2c3e50;
+    }
+}
+
+/* 右側面板背景色 */
+.right-panel {
+    background-color: #f8f9fc;
+    min-height: 100vh;
+    padding: 1rem;
+}
+
+/* 左側視訊區域樣式 */
+.video-main-card {
+    background: #f8f9fc;
+    border: none;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.video-card-body {
+    background: #f8f9fc;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 600px;
+}
+
+.video-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+/* 右側控制卡片樣式 */
+.control-card {
+    background: white;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+}
+
+.control-card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+}
+
+/* 確保專注度指示器在小螢幕上也能正常顯示 */
+.attention-indicator {
+    min-height: 80px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+/* 精簡統計卡片樣式 */
+.compact-card .card-header {
+    padding: 0.5rem 1rem;
+}
+
+.compact-card .card-body {
+    padding: 0.75rem;
+}
+
+/* 統計卡片的數字強調 */
+#avgAttention {
+    font-weight: bold;
+    color: #42a5f5 !important;
+}
+
+#detectionCount,
+#validDetections {
+    font-weight: 600;
+    color: #1976d2;
+}
+
+/* 進度條增強 */
+.progress {
+    height: 10px;
+    border-radius: 5px;
+}
+
+.progress-bar {
+    border-radius: 5px;
+}
+
+/* 警告框樣式增強 */
+#detectionWarning {
+    border-left: 4px solid #ff9800;
+    background: linear-gradient(45deg, #fff8e1, #ffecb3);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+#cameraStatus.alert-success {
+    border-left: 4px solid #4caf50;
+    background: linear-gradient(45deg, #e8f5e8, #c8e6c8);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+#cameraStatus.alert-danger {
+    border-left: 4px solid #f44336;
+    background: linear-gradient(45deg, #ffebee, #ffcdd2);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+#cameraStatus.alert-info {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* 完成模態框的統計卡片 */
+.modal-body .card.bg-light {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    border: 1px solid rgba(66, 165, 245, 0.1);
+}
+
+.modal-body .card h5 {
+    color: #1976d2;
+    font-weight: bold;
+}
+
+/* 縮減學習表現總覽和學習者資訊高度 */
+.summary-card .card-body {
+    padding: 0.15rem !important;
+}
+
+.summary-card .card-header {
+    padding: 0.15rem 1rem !important;
+}
+
+.summary-metric {
+    height: 30px !important;
+    padding: 0.1rem !important;
+}
+.summary-info-item {
+    padding: 0.2rem 0 !important;
+}
+
+.summary-alert {
+    padding: 0.25rem 0.5rem !important;
+    margin-top: 0.25rem !important;
+}
+
+.summary-card {
+    max-height: 250px !important;
+}
+
+.row.mb-3 {
+    margin-bottom: 1rem !important;
+}
+
+.summary-card .card-body {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    padding-top: 2rem !important;
+}
+
+.summary-card .row {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+.summary-alert {
+    margin-top: 0.2rem !important;
+}
