@@ -349,6 +349,72 @@ def index():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    """註冊功能"""
+    if request.method == 'POST':
+        try:
+            # 獲取 JSON 數據
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'message': '無效的請求數據'}), 400
+            
+            username = data.get('username', '').strip()
+            email = data.get('email', '').strip()
+            password = data.get('password', '')
+            
+            # 基本驗證
+            if not username or not email or not password:
+                return jsonify({'success': False, 'message': '請填寫所有欄位'}), 400
+            
+            if len(username) < 3 or len(username) > 20:
+                return jsonify({'success': False, 'message': '使用者名稱必須為3-20個字元'}), 400
+            
+            if len(password) < 6:
+                return jsonify({'success': False, 'message': '密碼至少需要6個字元'}), 400
+            
+            # 檢查使用者名稱是否已存在
+            existing_user = User.query.filter_by(username=username).first()
+            if existing_user:
+                return jsonify({'success': False, 'message': '使用者名稱已存在'}), 409
+            
+            # 檢查電子郵件是否已註冊
+            existing_email = User.query.filter_by(email=email).first()
+            if existing_email:
+                return jsonify({'success': False, 'message': '電子郵件已註冊'}), 409
+            
+            # 生成密碼哈希
+            try:
+                password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+            except Exception as hash_error:
+                print(f'密碼哈希失敗: {hash_error}')
+                return jsonify({'success': False, 'message': '密碼處理失敗，請稍後再試'}), 500
+            
+            # 創建新使用者
+            user = User(
+                username=username,
+                email=email,
+                password_hash=password_hash
+            )
+            
+            # 儲存到資料庫
+            db.session.add(user)
+            db.session.commit()
+            
+            print(f'✓ 新使用者註冊成功: {username}')
+            return jsonify({'success': True, 'message': '註冊成功'}), 200
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f'✗ 註冊失敗: {str(e)}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({'success': False, 'message': '註冊失敗，請稍後再試'}), 500
+    
+    # GET 請求返回註冊頁面
+    return render_template('register.html')
+
+'''
+@app.route('/register', methods=['GET', 'POST'])
+def register():
     if request.method == 'POST':
         data = request.get_json()
         username = data.get('username')
@@ -365,8 +431,56 @@ def register():
         db.session.add(user)
         db.session.commit()
         return jsonify({'success': True, 'message': '註冊成功'})
-    return render_template('register.html')
+    return render_template('register.html')'''
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """登入功能"""
+    if request.method == 'POST':
+        try:
+            # 獲取 JSON 數據
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'message': '無效的請求數據'}), 400
+            
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            
+            # 基本驗證
+            if not username or not password:
+                return jsonify({'success': False, 'message': '請輸入使用者名稱和密碼'}), 400
+            
+            # 查詢使用者
+            user = User.query.filter_by(username=username).first()
+            
+            if not user:
+                return jsonify({'success': False, 'message': '使用者名稱或密碼錯誤'}), 401
+            
+            # 驗證密碼
+            try:
+                password_valid = bcrypt.check_password_hash(user.password_hash, password)
+            except Exception as check_error:
+                print(f'密碼驗證失敗: {check_error}')
+                return jsonify({'success': False, 'message': '登入驗證失敗'}), 500
+            
+            if password_valid:
+                session['user_id'] = user.id
+                session['username'] = user.username
+                print(f'✓ 使用者登入成功: {username}')
+                return jsonify({'success': True, 'message': '登入成功'}), 200
+            else:
+                return jsonify({'success': False, 'message': '使用者名稱或密碼錯誤'}), 401
+                
+        except Exception as e:
+            print(f'✗ 登入失敗: {str(e)}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({'success': False, 'message': '登入失敗，請稍後再試'}), 500
+    
+    # GET 請求返回登入頁面
+    return render_template('login.html')
+
+'''
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -381,7 +495,7 @@ def login():
             return jsonify({'success': True, 'message': '登入成功'})
         else:
             return jsonify({'success': False, 'message': '使用者名稱或密碼錯誤'})
-    return render_template('login.html')
+    return render_template('login.html')'''
 
 @app.route('/child_selection')
 def child_selection():
@@ -1837,6 +1951,27 @@ def add_coop_coep(resp):
     # 我們自己的靜態資源也允許被跨源嵌入（保險用）
     resp.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
     return resp
+
+def init_database():
+    """初始化資料庫 - 確保所有表格都已建立"""
+    try:
+        with app.app_context():
+            # 建立所有資料表
+            db.create_all()
+            print('✓ 資料庫初始化完成')
+            
+            # 驗證資料表是否存在
+            inspector = db.inspect(db.engine)
+            tables = inspector.get_table_names()
+            print(f'✓ 資料表清單: {tables}')
+            
+    except Exception as e:
+        print(f'✗ 資料庫初始化失敗: {e}')
+        import traceback
+        traceback.print_exc()
+
+# 啟動時初始化資料庫
+init_database()
 
 if __name__ == '__main__':
     with app.app_context():
