@@ -1,22 +1,22 @@
-# Virtual environments
+# --- Virtual environments ---
 venv/
 .venv/
 
-# Python cache
+# --- Python cache ---
 __pycache__/
 *.pyc
 *.pyo
 
-# Flask local data / secrets
+# --- Flask local data / secrets ---
 instance/
 .env
 .env.*
 
-# Editors / OS
+# --- Editors / OS ---
 .DS_Store
 .idea/
 .vscode/
 
-# Generated outputs (adjust as needed)
+# --- Generated outputs (可依需要調整) ---
 reports/*.pdf
 reports/*.html
