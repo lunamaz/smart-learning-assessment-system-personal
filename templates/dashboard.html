@@ -60,12 +60,7 @@
                 <div class="card-body text-center">
                     <i class="fas fa-star fa-2x mb-2"></i>
                     <h4>
-                        {% if stats %}
-                            {% set avg_attention = (stats.values() | map(attribute='avg_attention') | sum) / (stats|length) %}
-                            {{ "%.0f" | format(avg_attention * 100 / 3) }}%
-                        {% else %}
-                            0%
-                        {% endif %}
+                        {{ overall_avg_attention }}%
                     </h4>
                     <p class="mb-0">平均專注度</p>
                 </div>

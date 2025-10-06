@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import json
 import os
@@ -28,6 +28,9 @@ from werkzeug.utils import secure_filename
 # === 統一的失敗訊息（無 API Key / 客戶端不可用 / 連線錯誤等一律用此訊息） ===
 FAILURE_TEXT = "AI建議暫時無法生成，請稍後再試。系統仍可正常提供其他學習建議。"
 LEGACY_OFFLINE_PREFIX = "【系統建議（未設定 API Key）】"   # 用於偵測並清除舊字串
+MIN_SESSION_MINUTES = 1
+def is_eligible_session(s):
+    return s.end_time is not None and (s.duration_minutes or 0) >= MIN_SESSION_MINUTES
 
 # --- OpenAI 可用性偵測 ---
 try:
@@ -147,13 +150,20 @@ except Exception as e:
     print(f"字體註冊過程發生錯誤: {e}")
     PDF_FONT = 'Helvetica'
 
+# 修正所有時間相關函數
+def get_taiwan_now():
+    """獲取當前台灣時間（naive datetime），用於記錄和顯示"""
+    utc_now = datetime.now(timezone.utc)
+    taiwan_time = utc_now + timedelta(hours=8)
+    return taiwan_time.replace(tzinfo=None)  # 返回 naive datetime
+
 # --------- Models ---------
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(60), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     children = db.relationship('Child', backref='user', lazy=True, cascade='all, delete-orphan')
 
 class Child(db.Model):
@@ -163,7 +173,7 @@ class Child(db.Model):
     gender = db.Column(db.String(10), nullable=False)
     age = db.Column(db.Integer, nullable=False)
     education_stage = db.Column(db.String(20), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     ai_suggestion = db.Column(db.Text)
     pdf_report_path = db.Column(db.String(255))
     pdf_generated_at = db.Column(db.DateTime)
@@ -174,7 +184,7 @@ class StudySession(db.Model):
     child_id = db.Column(db.Integer, db.ForeignKey('child.id'), nullable=False)
     subject = db.Column(db.String(50), nullable=False)
     duration_minutes = db.Column(db.Integer, nullable=False)
-    start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    start_time = db.Column(db.DateTime, default=datetime.now)
     end_time = db.Column(db.DateTime)
     avg_attention = db.Column(db.Float)
     avg_emotion_score = db.Column(db.Float)
@@ -183,7 +193,7 @@ class StudySession(db.Model):
 class EmotionData(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.Integer, db.ForeignKey('study_session.id'), nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
     emotion = db.Column(db.String(20))
     attention_level = db.Column(db.Integer)
     confidence = db.Column(db.Float)
@@ -194,7 +204,7 @@ class VideoWatch(db.Model):
     subject = db.Column(db.String(50), nullable=False)
     video_filename = db.Column(db.String(255), nullable=False)
     video_display_name = db.Column(db.String(255), nullable=False)
-    started_at = db.Column(db.DateTime, default=datetime.utcnow)
+    started_at = db.Column(db.DateTime, default=datetime.now)
     ended_at = db.Column(db.DateTime)
     duration_seconds = db.Column(db.Integer, default=0)
 
@@ -208,6 +218,11 @@ SUBJECTS = {
 }
 EDUCATION_STAGES = {'elementary': '國小', 'middle': '國中', 'high': '高中'}
 GENDERS = {'male': '男生', 'female': '女生'}
+
+def compute_overall_avg_attention_percent(sessions):
+    """以『場次平均』計算整體平均專注度（0~100%），忽略 0 與 None。"""
+    vals = [s.avg_attention for s in sessions if s.avg_attention]  # 0 被排除
+    return round(sum(vals) / len(vals) * 100 / 3) if vals else 0
 
 # ----------------- 影片輔助 -----------------
 def get_subject_video_dir(subject_key: str) -> str:
@@ -244,42 +259,42 @@ def generate_ai_suggestions(child, study_sessions):
         return FAILURE_TEXT
 
     try:
-        total_sessions = len(study_sessions)
+        eligible = [s for s in study_sessions if is_eligible_session(s)]
+        total_sessions = len(eligible)
+
         if total_sessions == 0:
             learning_summary = "目前尚無學習記錄"
         else:
-            total_minutes = sum(s.duration_minutes for s in study_sessions)
-            attention_sessions = [s for s in study_sessions if s.avg_attention]
-            if attention_sessions:
-                avg_attention = sum(s.avg_attention for s in attention_sessions) / len(attention_sessions)
-                avg_attention_percent = round(avg_attention * 100 / 3)
-            else:
-                avg_attention_percent = 0
+            total_minutes = sum(s.duration_minutes or 0 for s in eligible)
+            avg_attention_percent = compute_overall_avg_attention_percent(eligible)  # ← 與前台一致
 
             subject_stats = {}
-            for session in study_sessions:
-                if session.subject not in subject_stats:
-                    subject_stats[session.subject] = {'count': 0, 'total_time': 0, 'avg_attention': 0}
-                subject_stats[session.subject]['count'] += 1
-                subject_stats[session.subject]['total_time'] += session.duration_minutes
-                if session.avg_attention:
-                    subject_stats[session.subject]['avg_attention'] += session.avg_attention
+            for session in eligible:
+                d = subject_stats.setdefault(session.subject, {
+                    'count': 0, 'total_time': 0,
+                    'att_sum': 0.0, 'att_cnt': 0
+                })
+                d['count'] += 1
+                d['total_time'] += (session.duration_minutes or 0)
+                if session.avg_attention:  # ← 忽略 0
+                    d['att_sum'] += session.avg_attention
+                    d['att_cnt'] += 1
 
             best_subject = ""
             worst_subject = ""
             if subject_stats:
-                best_perf = 0
-                worst_perf = float('inf')
-                for subject, stats in subject_stats.items():
-                    if stats['count'] > 0:
-                        avg_att = stats['avg_attention'] / stats['count'] if stats['avg_attention'] > 0 else 0
-                        if avg_att > best_perf:
-                            best_perf = avg_att
-                            best_subject = SUBJECTS.get(subject, subject)
-                        if avg_att < worst_perf and avg_att > 0:
-                            worst_perf = avg_att
-                            worst_subject = SUBJECTS.get(subject, subject)
-
+                best_avg = -1
+                worst_avg = 10**9
+                for subj, st in subject_stats.items():
+                    avg_att = (st['att_sum'] / st['att_cnt']) if st['att_cnt'] > 0 else None
+                    if avg_att is not None:
+                        if avg_att > best_avg:
+                            best_avg = avg_att
+                            best_subject = SUBJECTS.get(subj, subj)
+                        if avg_att < worst_avg:
+                            worst_avg = avg_att
+                            worst_subject = SUBJECTS.get(subj, subj)
+                            
             learning_summary = f"""
             總學習次數: {total_sessions}次
             總學習時間: {total_minutes}分鐘
@@ -301,11 +316,11 @@ def generate_ai_suggestions(child, study_sessions):
         {learning_summary}
 
         請提供以下方面的建議，每個建議都要具體且可執行：
-        1. 根據年齡和教育階段的學習策略建議
-        2. 專注力提升的具體方法
-        3. 學習時間安排和休息規劃
-        4. 基於目前表現的改進建議
-        5. 適合該年齡層的學習工具或方法
+        1. 年齡與階段的學習策略
+        2. 專注力提升方法
+        3. 時間安排與休息規劃
+        4. 基於目前表現的改進
+        5. 合適的工具或方法
 
         請用溫柔、鼓勵的口吻，以一段話呈現（非條列），總長度控制在300字內，繁體中文。
         """
@@ -422,6 +437,7 @@ def select_child(child_id):
     session['child_nickname'] = child.nickname
     return redirect(url_for('dashboard'))
 
+'''
 @app.route('/dashboard')
 def dashboard():
     if 'user_id' not in session or 'child_id' not in session:
@@ -432,24 +448,99 @@ def dashboard():
     if not child:
         return redirect(url_for('child_selection'))
 
-    user_study_sessions = StudySession.query.filter_by(child_id=child_id).all()
+    # 只統計「已完成（end_time 不為空）」的學習場次
+    user_study_sessions = (StudySession.query
+                           .filter_by(child_id=child_id)
+                           .filter(StudySession.end_time.isnot(None))
+                           .all())
+
     subject_stats = {}
-    for study_record in user_study_sessions:
-        if study_record.subject not in subject_stats:
-            subject_stats[study_record.subject] = {'count': 0, 'total_time': 0, 'avg_attention': 0}
-        subject_stats[study_record.subject]['count'] += 1
-        subject_stats[study_record.subject]['total_time'] += study_record.duration_minutes
-        if study_record.avg_attention:
-            subject_stats[study_record.subject]['avg_attention'] += study_record.avg_attention
+    for s in user_study_sessions:
+        if s.subject not in subject_stats:
+            subject_stats[s.subject] = {
+                'count': 0,
+                'total_time': 0,
+                'avg_attention_sum': 0.0,
+                'attention_count': 0,
+                'avg_attention': 0.0  # 供模板使用
+            }
+        subject_stats[s.subject]['count'] += 1
+        subject_stats[s.subject]['total_time'] += (s.duration_minutes or 0)
+        if s.avg_attention is not None:
+            subject_stats[s.subject]['avg_attention_sum'] += s.avg_attention
+            subject_stats[s.subject]['attention_count'] += 1
 
     for subject in subject_stats:
-        if subject_stats[subject]['count'] > 0:
-            subject_stats[subject]['avg_attention'] /= subject_stats[subject]['count']
+        cnt = subject_stats[subject]['attention_count']
+        subject_stats[subject]['avg_attention'] = (subject_stats[subject]['avg_attention_sum'] / cnt) if cnt else 0.0
+        # 清掉內部欄位，避免模板誤用
+        del subject_stats[subject]['avg_attention_sum']
+        del subject_stats[subject]['attention_count']
 
     return render_template('dashboard.html',
                            subjects=SUBJECTS,
                            stats=subject_stats,
-                           child=child)
+                           child=child)'''
+
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session or 'child_id' not in session:
+        return redirect(url_for('child_selection'))
+
+    child_id = session['child_id']
+    child = Child.query.filter_by(id=child_id, user_id=session['user_id']).first()
+    if not child:
+        return redirect(url_for('child_selection'))
+
+    # 只統計「已完成（end_time 不為空）」的學習場次
+    user_study_sessions = (StudySession.query
+                           .filter_by(child_id=child_id)
+                           .filter(StudySession.end_time.isnot(None))
+                           .filter(StudySession.duration_minutes >= MIN_SESSION_MINUTES)  # ★ 新增
+                           .all())
+
+    subject_stats = {}
+    for s in user_study_sessions:
+        d = subject_stats.setdefault(s.subject, {
+            'count': 0,
+            'total_time': 0,
+            'avg_attention_sum': 0.0,
+            'attention_count': 0,
+            'avg_attention': 0.0
+        })
+        d['count'] += 1
+        d['total_time'] += (s.duration_minutes or 0)
+        if s.avg_attention is not None:
+            d['avg_attention_sum'] += s.avg_attention
+            d['attention_count'] += 1
+
+    for subject, d in subject_stats.items():
+        cnt = d['attention_count']
+        d['avg_attention'] = (d['avg_attention_sum'] / cnt) if cnt else 0.0
+        d.pop('avg_attention_sum', None)
+        d.pop('attention_count', None)
+
+    # ★ 供首頁顯示：以「時數最長」當作最常學習科目
+    most_by_time_key = max(subject_stats.items(), key=lambda kv: kv[1]['total_time'])[0] if subject_stats else None
+    most_by_time_name = SUBJECTS.get(most_by_time_key, most_by_time_key) if most_by_time_key else None
+
+    # ★ 供首頁顯示：整體平均專注度（百分比）
+    att_list = [s.avg_attention for s in user_study_sessions if s.avg_attention is not None]
+    # overall_avg_attention_percent = round(sum(att_list)/len(att_list) * 100/3) if att_list else 0
+    overall_avg_attention_percent = compute_overall_avg_attention_percent(user_study_sessions)
+
+    total_minutes = sum(s.duration_minutes or 0 for s in user_study_sessions)
+    total_hours = total_minutes / 60
+
+    return render_template('dashboard.html',
+                           subjects=SUBJECTS,
+                           stats=subject_stats,
+                           child=child,
+                           overall_avg_attention=overall_avg_attention_percent,
+                           total_sessions=len(user_study_sessions),
+                           total_hours=total_hours,
+                           most_studied_subject_by_time=most_by_time_name)
+
 
 @app.route('/video-selection/<subject>')
 def video_selection(subject):
@@ -524,6 +615,7 @@ def api_list_videos(subject):
 
 @app.post('/api/session/start')
 def api_session_start():
+    """開始學習階段 - 新版 API（修正版）"""
     if 'user_id' not in session or 'child_id' not in session:
         return jsonify({'ok': False, 'error': 'unauthorized'}), 401
 
@@ -532,38 +624,68 @@ def api_session_start():
     if subject not in SUBJECTS:
         return jsonify({'ok': False, 'error': 'invalid subject'}), 400
 
+    now = get_taiwan_now()  # 使用台灣時間
+    
     s = StudySession(
         child_id=session['child_id'],
         subject=subject,
-        start_time=datetime.utcnow(),
+        start_time=now,
         duration_minutes=0
     )
     db.session.add(s)
     db.session.commit()
 
+    # ===== 關鍵修正：設定到 Flask session 中，供 /record_emotion 使用 =====
     session['current_session_id'] = s.id
-    session['session_start_time'] = datetime.utcnow().isoformat()
+    session['session_start_time'] = now.isoformat()
+    
+    print(f"[API] 學習階段開始 - ID: {s.id}, 科目: {subject}, 時間: {now}")
     return jsonify({'ok': True, 'session_id': s.id})
+
 
 @app.post('/api/session/end')
 def api_session_end():
+    """結束學習階段 - 新版 API（修正版）"""
     if 'user_id' not in session or 'child_id' not in session:
         return jsonify({'ok': False, 'error': 'unauthorized'}), 401
 
     data = request.get_json(force=True) or {}
     session_id = data.get('session_id')
+    
     s = StudySession.query.get(session_id)
     if not s or s.child_id != session['child_id']:
         return jsonify({'ok': False, 'error': 'invalid session'}), 400
 
-    s.end_time = datetime.utcnow()
+    now = get_taiwan_now()  # 使用台灣時間
+    s.end_time = now
+    
+    # ===== 關鍵：正確計算時間差 =====
     if s.start_time and s.end_time:
         delta = s.end_time - s.start_time
-        s.duration_minutes = int(delta.total_seconds() // 60)
-    db.session.commit()
+        minutes = int(delta.total_seconds() / 60)
+        s.duration_minutes = max(0, minutes)  # 防止負數
+        
+        print(f"[API] 學習階段結束 - ID: {s.id}")
+        print(f"  開始時間: {s.start_time}")
+        print(f"  結束時間: {s.end_time}")
+        print(f"  學習時長: {s.duration_minutes} 分鐘")
 
+    # 計算情緒統計
+    emotion_records = EmotionData.query.filter_by(session_id=session_id).all()
+    if emotion_records:
+        avg_attention = sum(r.attention_level for r in emotion_records) / len(emotion_records)
+        avg_emotion = sum(r.confidence for r in emotion_records) / len(emotion_records)
+        s.avg_attention = avg_attention
+        s.avg_emotion_score = avg_emotion
+        print(f"  平均專注度: {avg_attention:.2f}")
+        print(f"  情緒記錄數: {len(emotion_records)}")
+
+    db.session.commit()
+    
+    # 清除 session
     session.pop('current_session_id', None)
     session.pop('session_start_time', None)
+    
     return jsonify({'ok': True})
 
 @app.post('/api/video/start')
@@ -584,9 +706,11 @@ def api_video_start():
     if not filename or not display_name:
         return jsonify({'ok': False, 'error': 'missing video info'}), 400
 
+    local_now = get_taiwan_now()
+    
     vw = VideoWatch(session_id=session_id, subject=subject,
                     video_filename=filename, video_display_name=display_name,
-                    started_at=datetime.utcnow())
+                    started_at=local_now)
     db.session.add(vw)
     db.session.commit()
     return jsonify({'ok': True, 'watch_id': vw.id})
@@ -602,14 +726,20 @@ def api_video_end():
     if not vw:
         return jsonify({'ok': False, 'error': 'invalid watch id'}), 400
 
-    vw.ended_at = datetime.utcnow()
+    local_now = get_taiwan_now()
+    vw.ended_at = local_now
+    
     if vw.started_at and vw.ended_at:
         vw.duration_seconds = int((vw.ended_at - vw.started_at).total_seconds())
     db.session.commit()
     return jsonify({'ok': True, 'duration_seconds': vw.duration_seconds})
 
+# ===== 舊版相容路由（若外部 JS 仍調用） =====
 @app.route('/start_session', methods=['POST'])
 def start_session():
+    """⚠️ 已廢棄：請使用 /api/session/start"""
+    print("[警告] 使用了舊版 /start_session API，建議改用 /api/session/start")
+    
     if 'user_id' not in session or 'child_id' not in session:
         return jsonify({'success': False, 'message': '請先登入並選擇小孩'})
 
@@ -617,21 +747,24 @@ def start_session():
     subject = data.get('subject')
     duration = data.get('duration', 30)
 
+    now = get_taiwan_now()  # 修正：使用台灣時間
+    
     new_study_session = StudySession(
         child_id=session['child_id'],
         subject=subject,
         duration_minutes=duration,
-        start_time=datetime.utcnow()
+        start_time=now
     )
     db.session.add(new_study_session)
     db.session.commit()
 
     session['current_session_id'] = new_study_session.id
-    session['session_start_time'] = datetime.utcnow().isoformat()
+    session['session_start_time'] = now.isoformat()
     return jsonify({'success': True, 'session_id': new_study_session.id})
 
 @app.route('/record_emotion', methods=['POST'])
 def record_emotion():
+    """記錄情緒數據（保持不變，使用 session['current_session_id']）"""
     if 'current_session_id' not in session:
         return jsonify({'success': False, 'message': '沒有活躍的學習階段'})
 
@@ -640,17 +773,54 @@ def record_emotion():
     attention_level = data.get('attention_level')
     confidence = data.get('confidence')
 
+    now = get_taiwan_now()  # 使用台灣時間
+
     emotion_data = EmotionData(
         session_id=session['current_session_id'],
         emotion=emotion,
         attention_level=attention_level,
         confidence=confidence,
-        timestamp=datetime.utcnow()
+        timestamp=now
     )
     db.session.add(emotion_data)
     db.session.commit()
     return jsonify({'success': True})
 
+@app.route('/end_session', methods=['POST'])
+def end_session():
+    """⚠️ 已廢棄：請使用 /api/session/end"""
+    print("[警告] 使用了舊版 /end_session API，建議改用 /api/session/end")
+    
+    if 'current_session_id' not in session:
+        return jsonify({'success': False, 'message': '沒有活躍的學習階段'})
+
+    session_id = session['current_session_id']
+    current_study_session = StudySession.query.get(session_id)
+
+    if current_study_session:
+        local_now = get_taiwan_now()
+        current_study_session.end_time = local_now
+
+        if 'session_start_time' in session:
+            start_time = datetime.fromisoformat(session['session_start_time'])
+            actual_duration = (local_now - start_time).total_seconds() / 60
+            current_study_session.duration_minutes = int(actual_duration)
+
+        emotion_records = EmotionData.query.filter_by(session_id=session_id).all()
+        if emotion_records:
+            avg_attention = sum(r.attention_level for r in emotion_records) / len(emotion_records)
+            avg_emotion = sum(r.confidence for r in emotion_records) / len(emotion_records)
+            current_study_session.avg_attention = avg_attention
+            current_study_session.avg_emotion_score = avg_emotion
+
+        db.session.commit()
+        session.pop('current_session_id', None)
+        session.pop('session_start_time', None)
+        return jsonify({'success': True, 'session_id': session_id})
+
+    return jsonify({'success': False, 'message': '找不到學習階段'})
+
+'''
 @app.route('/end_session', methods=['POST'])
 def end_session():
     if 'current_session_id' not in session:
@@ -679,7 +849,7 @@ def end_session():
         session.pop('session_start_time', None)
         return jsonify({'success': True, 'session_id': session_id})
 
-    return jsonify({'success': False, 'message': '找不到學習階段'})
+    return jsonify({'success': False, 'message': '找不到學習階段'})'''
 
 def get_best_subject_for_date(child_id, date):
     sessions = StudySession.query.filter(
@@ -770,13 +940,157 @@ def data_analysis():
     if not child:
         return redirect(url_for('child_selection'))
 
-    study_sessions = StudySession.query.filter_by(child_id=child.id).order_by(StudySession.start_time.desc()).all()
+    # 只取已完成的學習場次（有 end_time）
+    study_sessions = (StudySession.query
+                     .filter_by(child_id=child.id)
+                     .filter(StudySession.end_time.isnot(None))
+                     .filter(StudySession.duration_minutes >= MIN_SESSION_MINUTES)  # ★ 新增
+                     .order_by(StudySession.start_time.desc())
+                     .all())
+    
+    chart_data = prepare_chart_data(study_sessions)
+    overall_avg_attention_percent = compute_overall_avg_attention_percent(study_sessions)
+    return render_template('data_analysis.html',
+                           child=child,
+                           study_sessions=study_sessions,
+                           chart_data=chart_data,
+                           overall_avg_attention=overall_avg_attention_percent)
+
+''' # 10/07 12:03 AM 註解
+@app.route('/data_analysis')
+def data_analysis():
+    if 'user_id' not in session or 'child_id' not in session:
+        return redirect(url_for('child_selection'))
+
+    child = Child.query.filter_by(id=session['child_id'], user_id=session['user_id']).first()
+    if not child:
+        return redirect(url_for('child_selection'))
+
+    # 只取已完成的學習場次（有 end_time）
+    study_sessions = (StudySession.query
+                     .filter_by(child_id=child.id)
+                     .filter(StudySession.end_time.isnot(None))
+                     .order_by(StudySession.start_time.desc())
+                     .all())
+    
     chart_data = prepare_chart_data(study_sessions)
     return render_template('data_analysis.html',
                            child=child,
                            study_sessions=study_sessions,
                            chart_data=chart_data)
+'''
 
+'''
+@app.route('/data_analysis')
+def data_analysis():
+    if 'user_id' not in session or 'child_id' not in session:
+        return redirect(url_for('child_selection'))
+
+    child = Child.query.filter_by(id=session['child_id'], user_id=session['user_id']).first()
+    if not child:
+        return redirect(url_for('child_selection'))
+
+    study_sessions = StudySession.query.filter_by(child_id=child.id).order_by(StudySession.start_time.desc()).all()
+    chart_data = prepare_chart_data(study_sessions)
+    return render_template('data_analysis.html',
+                           child=child,
+                           study_sessions=study_sessions,
+                           chart_data=chart_data)'''
+
+@app.route('/smart_suggestions')
+def smart_suggestions():
+    """智慧建議頁面：不自動產生；若偵測到舊的離線文案，載入時即清掉並顯示統一失敗訊息。"""
+    if 'user_id' not in session or 'child_id' not in session:
+        return redirect(url_for('child_selection'))
+
+    child = Child.query.filter_by(id=session['child_id'], user_id=session['user_id']).first()
+    if not child:
+        return redirect(url_for('child_selection'))
+
+    # 只取已完成的學習場次（有 end_time）
+    study_sessions = (StudySession.query
+                     .filter_by(child_id=child.id)
+                     .filter(StudySession.end_time.isnot(None))
+                     .filter(StudySession.duration_minutes >= MIN_SESSION_MINUTES)  # ★ 新增
+                     .order_by(StudySession.start_time.asc())
+                     .all())
+    
+    suggestions = generate_comprehensive_suggestions(child, study_sessions)
+
+    ai_suggestion_db = child.ai_suggestion or ""
+    # 清除舊的離線文案
+    if ai_suggestion_db.startswith(LEGACY_OFFLINE_PREFIX):
+        child.ai_suggestion = None
+        db.session.commit()
+        ai_suggestion_db = ""
+
+    # 若目前不可產生（無 key / 關閉 / client 不存在），顯示統一的友善訊息（但不寫回 DB）
+    if not has_openai_client() and not ai_suggestion_db:
+        ai_suggestion_display = FAILURE_TEXT
+    else:
+        ai_suggestion_display = ai_suggestion_db or None
+
+    performance_data = prepare_performance_data(study_sessions)
+
+    return render_template(
+        'smart_suggestions.html',
+        child=child,
+        suggestions=suggestions,
+        ai_suggestion=ai_suggestion_display,
+        ai_enabled=True,
+        ai_can_generate=has_openai_client(),
+        auto_generate=(has_openai_client() and not ai_suggestion_db),
+        performance_data=performance_data
+    )
+
+''' # 10/07 12:04 AM 註解
+@app.route('/smart_suggestions')
+def smart_suggestions():
+    """智慧建議頁面：不自動產生；若偵測到舊的離線文案，載入時即清掉並顯示統一失敗訊息。"""
+    if 'user_id' not in session or 'child_id' not in session:
+        return redirect(url_for('child_selection'))
+
+    child = Child.query.filter_by(id=session['child_id'], user_id=session['user_id']).first()
+    if not child:
+        return redirect(url_for('child_selection'))
+
+    # 只取已完成的學習場次（有 end_time）
+    study_sessions = (StudySession.query
+                     .filter_by(child_id=child.id)
+                     .filter(StudySession.end_time.isnot(None))
+                     .order_by(StudySession.start_time.asc())
+                     .all())
+    
+    suggestions = generate_comprehensive_suggestions(child, study_sessions)
+
+    ai_suggestion_db = child.ai_suggestion or ""
+    # 清除舊的離線文案
+    if ai_suggestion_db.startswith(LEGACY_OFFLINE_PREFIX):
+        child.ai_suggestion = None
+        db.session.commit()
+        ai_suggestion_db = ""
+
+    # 若目前不可產生（無 key / 關閉 / client 不存在），顯示統一的友善訊息（但不寫回 DB）
+    if not has_openai_client() and not ai_suggestion_db:
+        ai_suggestion_display = FAILURE_TEXT
+    else:
+        ai_suggestion_display = ai_suggestion_db or None
+
+    performance_data = prepare_performance_data(study_sessions)
+
+    return render_template(
+        'smart_suggestions.html',
+        child=child,
+        suggestions=suggestions,
+        ai_suggestion=ai_suggestion_display,
+        ai_enabled=True,
+        ai_can_generate=has_openai_client(),
+        auto_generate=(has_openai_client() and not ai_suggestion_db),
+        performance_data=performance_data
+    )
+'''
+
+'''
 @app.route('/smart_suggestions')
 def smart_suggestions():
     """智慧建議頁面：不自動產生；若偵測到舊的離線文案，載入時即清掉並顯示統一失敗訊息。"""
@@ -811,10 +1125,10 @@ def smart_suggestions():
         suggestions=suggestions,
         ai_suggestion=ai_suggestion_display,
         ai_enabled=True,
-        ai_can_generate=has_openai_client(),           # 前端可以用它決定是否顯示「重新生成」或提示設定 API Key
-        auto_generate=(has_openai_client() and not ai_suggestion_db),  # 僅在可用且尚無建議時自動
+        ai_can_generate=has_openai_client(),
+        auto_generate=(has_openai_client() and not ai_suggestion_db),
         performance_data=performance_data
-    )
+    )'''
 
 @app.route('/generate_ai_suggestion', methods=['POST'])
 def generate_ai_suggestion_api():
@@ -848,7 +1162,7 @@ def generate_ai_suggestion_api():
         # 仍回 200 + 統一友善訊息，讓前端把 spinner 停掉
         return jsonify({'success': True, 'ai_suggestion': FAILURE_TEXT})
 
-# ----------------- 報告/刪除/更新等其餘路由（原樣） -----------------
+# ----------------- 報告/刪除/更新等其餘路由 -----------------
 @app.route('/generate_report/<int:child_id>')
 def generate_report(child_id):
     if 'user_id' not in session:
@@ -1009,6 +1323,63 @@ def update_child_profile():
     return jsonify({'success': False, 'message': '找不到小孩檔案'})
 
 def prepare_chart_data(study_sessions):
+    chart_data = {
+        'subjects': [],
+        'attention_scores': [],
+        'study_times': [],
+        'dates': [],
+        'attention_trend': [],
+        'subject_colors': []  # 新增：科目對應的顏色
+    }
+    
+    # 科目顏色映射（與圓餅圖一致）
+    COLOR_MAP = {
+        'math': '#42a5f5',
+        'science': '#66bb6a',
+        'language': '#ef5350',
+        'social': '#ffb74d',
+        'art': '#ab47bc',
+        'cs': '#26c6da'
+    }
+    
+    subject_stats = {}
+    for s in study_sessions:
+        if s.subject not in subject_stats:
+            subject_stats[s.subject] = {
+                'total_time': 0,
+                'avg_attention': 0,
+                'count': 0,
+                'attention_count': 0
+            }
+        subject_stats[s.subject]['total_time'] += s.duration_minutes
+        subject_stats[s.subject]['count'] += 1
+        if s.avg_attention:
+            subject_stats[s.subject]['avg_attention'] += s.avg_attention
+            subject_stats[s.subject]['attention_count'] += 1
+        # if s.avg_attention is not None:
+        #     subject_stats[s.subject]['avg_attention'] += s.avg_attention
+        #     subject_stats[s.subject]['attention_count'] += 1
+
+    for subject, stats in subject_stats.items():
+        chart_data['subjects'].append(SUBJECTS.get(subject, subject))
+        chart_data['study_times'].append(stats['total_time'])
+        chart_data['subject_colors'].append(COLOR_MAP.get(subject, '#95a5a6'))  # 新增顏色
+        
+        if stats['attention_count'] > 0:
+            avg = stats['avg_attention'] / stats['attention_count']
+            chart_data['attention_scores'].append(round(avg * 100 / 3))
+        else:
+            chart_data['attention_scores'].append(0)
+
+    recent = sorted(study_sessions, key=lambda x: x.start_time)[-10:]
+    for s in recent:
+        chart_data['dates'].append(s.start_time.strftime('%m/%d'))
+        chart_data['attention_trend'].append(round(s.avg_attention * 100 / 3) if s.avg_attention else 0)
+    
+    return chart_data
+
+'''
+def prepare_chart_data(study_sessions):
     chart_data = {'subjects': [], 'attention_scores': [], 'study_times': [], 'dates': [], 'attention_trend': []}
     subject_stats = {}
     for s in study_sessions:
@@ -1032,8 +1403,101 @@ def prepare_chart_data(study_sessions):
     for s in recent:
         chart_data['dates'].append(s.start_time.strftime('%m/%d'))
         chart_data['attention_trend'].append(round(s.avg_attention * 100 / 3) if s.avg_attention else 0)
-    return chart_data
+    return chart_data'''
 
+def prepare_performance_data(study_sessions):
+    # data = {
+    #     'total_sessions': len(study_sessions),
+    #     'total_hours': sum(s.duration_minutes for s in study_sessions) / 60,
+    #     'avg_attention': 0,
+    #     'best_subject': '',
+    #     'improvement_rate': 0
+    # }
+    eligible = [s for s in study_sessions if is_eligible_session(s)]
+    data = {
+        'total_sessions': len(eligible),
+        'total_hours': sum(s.duration_minutes or 0 for s in eligible) / 60,
+        'avg_attention': compute_overall_avg_attention_percent(eligible),  # ← 統一
+        'best_subject': '',
+        'improvement_rate': 0
+    }
+
+    if not study_sessions:
+        return data
+
+    # # 平均專注度（百分比）
+    # att = [s.avg_attention for s in study_sessions if s.avg_attention is not None]
+    # if att:
+    #     data['avg_attention'] = round(sum(att) / len(att) * 100 / 3)
+    # data['avg_attention'] = compute_overall_avg_attention_percent(study_sessions)
+
+    # ★ 以總學習時間決定「最常學習科目」
+    time_by_subject = {}
+    for s in study_sessions:
+        time_by_subject[s.subject] = time_by_subject.get(s.subject, 0) + (s.duration_minutes or 0)
+    if time_by_subject:
+        best_key = max(time_by_subject.items(), key=lambda kv: kv[1])[0]
+        data['best_subject'] = SUBJECTS.get(best_key, best_key)
+
+    # att = [s.avg_attention for s in study_sessions if s.avg_attention is not None]
+    # # 進步幅度（用最近 3 場 vs 最早 3 場）
+    # if len(att) >= 5:
+    #     early = sum(att[:3]) / 3
+    #     recent = sum(att[-3:]) / 3
+    #     if early:
+    #         data['improvement_rate'] = round((recent - early) / early * 100)
+    # att = [s.avg_attention for s in eligible if s.avg_attention is not None]
+    att = [s.avg_attention for s in eligible if s.avg_attention]
+    if len(att) >= 5:
+        early = sum(att[:3]) / 3
+        recent = sum(att[-3:]) / 3
+        if early:
+            data['improvement_rate'] = round((recent - early) / early * 100)
+
+    return data
+
+''' # 10/07 12:06 註解
+def prepare_performance_data(study_sessions):
+    data = {
+        'total_sessions': len(study_sessions),
+        'total_hours': sum(s.duration_minutes for s in study_sessions) / 60,
+        'avg_attention': 0,
+        'best_subject': '',
+        'improvement_rate': 0
+    }
+    
+    if study_sessions:
+        # 計算平均專注度
+        att = [s for s in study_sessions if s.avg_attention]
+        if att:
+            data['avg_attention'] = round(sum(s.avg_attention for s in att) / len(att) * 100 / 3)
+        
+        # 找出最常學習的科目（以學習次數為準）
+        subject_count = {}
+        subject_attention = {}
+        for s in study_sessions:
+            subject_count[s.subject] = subject_count.get(s.subject, 0) + 1
+            if s.avg_attention:
+                if s.subject not in subject_attention:
+                    subject_attention[s.subject] = []
+                subject_attention[s.subject].append(s.avg_attention)
+        
+        # 找出學習次數最多的科目
+        if subject_count:
+            best_subject_key = max(subject_count.items(), key=lambda x: x[1])[0]
+            data['best_subject'] = SUBJECTS.get(best_subject_key, best_subject_key)
+        
+        # 計算進步幅度
+        if len(att) >= 5:
+            early = sum(s.avg_attention for s in att[:3]) / 3
+            recent = sum(s.avg_attention for s in att[-3:]) / 3
+            if early:
+                data['improvement_rate'] = round((recent - early) / early * 100)
+    
+    return data
+'''
+
+'''
 def prepare_performance_data(study_sessions):
     data = {'total_sessions': len(study_sessions), 'total_hours': sum(s.duration_minutes for s in study_sessions) / 60,
             'avg_attention': 0, 'best_subject': '', 'improvement_rate': 0}
@@ -1053,7 +1517,7 @@ def prepare_performance_data(study_sessions):
             recent = sum(s.avg_attention for s in att[-3:]) / 3
             if early:
                 data['improvement_rate'] = round((recent - early) / early * 100)
-    return data
+    return data'''
 
 def generate_comprehensive_suggestions(child, study_sessions):
     suggestions = {'learning_style': [], 'schedule': [], 'subject_specific': [], 'attention_improvement': [], 'age_appropriate': []}
@@ -1123,7 +1587,6 @@ def generate_comprehensive_suggestions(child, study_sessions):
         attention_level = "high" if overall_avg >= 2.5 else "medium" if overall_avg >= 1.5 else "low"
 
         def get_subject_improvement_suggestion(subject, age, gender, education_stage, attention_level):
-            # 簡化版本（保留你的細節亦可）
             base = {
                 'math': {'elementary': "用教具與遊戲幫助理解", 'middle': "先鞏固基礎概念再做題", 'high': "分解大題成小步驟"},
                 'science': {'elementary': "多做小實驗增加興趣", 'middle': "用概念圖整理知識", 'high': "連結生活情境找應用"},
@@ -1364,6 +1827,16 @@ def favicon():
         return send_from_directory(static_dir, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
     from flask import Response
     return Response(status=204)
+
+# --- COOP/COEP: 讓 SIMD WASM 可用（必做） ---
+@app.after_request
+def add_coop_coep(resp):
+    # 讓當前頁成為「跨源隔離」的 opener/嵌入者
+    resp.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+    resp.headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
+    # 我們自己的靜態資源也允許被跨源嵌入（保險用）
+    resp.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
+    return resp
 
 if __name__ == '__main__':
     with app.app_context():

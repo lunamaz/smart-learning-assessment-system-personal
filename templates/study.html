@@ -10,7 +10,7 @@
         <div class="card-header d-flex align-items-center justify-content-between">
           <h4 class="mb-0"><i class="fas fa-video text-primary me-2"></i>{{ child.nickname }} - {{ subject_name }} 學習檢測</h4>
 
-          <!-- ⑥ 下拉式選單：開始學習後才 enable -->
+          <!-- 影片切換（開始學習後啟用） -->
           <div class="d-flex align-items-center gap-2">
             <label for="videoSelect" class="mb-0 small text-muted">切換影片</label>
             <select id="videoSelect" class="form-select form-select-sm" disabled style="min-width: 220px;"></select>
@@ -18,8 +18,7 @@
         </div>
 
         <div class="card-body video-card-body">
-
-          <!-- 課程影片（縮小） -->
+          <!-- 課程影片 -->
           <div id="courseBox" class="course-video-container mb-3" style="display:none;">
             <h6 class="text-center mb-2">
               <i class="fas fa-film me-2 text-primary"></i><span id="courseTitle"></span>
@@ -30,48 +29,64 @@
             </video>
           </div>
 
-          <!-- 相機 + 右側 AI 就緒膠囊 -->
-          <div class="d-flex align-items-start justify-content-center gap-3 flex-wrap">
+          <!-- 相機 + 固定右側警告區 -->
+          <div class="camera-warning-wrapper">
             <div class="video-container">
-              <video id="video" autoplay muted playsinline></video>
-              <canvas id="canvas" width="300" height="300" style="display:none;"></canvas>
+                <video id="video" autoplay muted playsinline></video>
+                <canvas id="canvas" width="300" height="300" style="display:none;"></canvas>
             </div>
 
-            <!-- <div class="ai-ready-pill" id="aiReadyPill" style="display:none;">
-              <i class="fas fa-check-circle me-2"></i>AI 模型已就緒，可以開始學習
-            </div> -->
-            
-            <!-- 右側直欄：先 AI 就緒，下面放警告 -->
-            <div id="sideInfoColumn" class="side-info">
-              <div class="ai-ready-pill" id="aiReadyPill" style="display:none;">
-                <i class="fas fa-check-circle me-2"></i>AI 模型已就緒，可以開始學習
-              </div>
-
-              <div id="detectionWarning" class="alert alert-warning mt-2" style="display:none;">
-                <i class="fas fa-exclamation-triangle me-2"></i><span id="warningMessage"></span>
-              </div>
+            <div class="side-warning-area">
+                <div id="detectionWarning" class="alert alert-warning" style="display:none;">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span id="warningMessage"></span>
+                </div>
             </div>
           </div>
 
-          <div id="cameraStatus" class="alert alert-info mt-3">
-            <i class="fas fa-info-circle me-2"></i>正在啟動攝影機...
-          </div>
-
-          <!-- <div id="detectionWarning" class="alert alert-warning mt-3" style="display:none;">
-            <i class="fas fa-exclamation-triangle me-2"></i><span id="warningMessage"></span>
+          <!-- ✅ 修改：雙狀態獨立顯示 -->
+          <!-- <div class="row mt-3 status-row">
+            <div class="col-md-6">
+              <div id="cameraStatus" class="alert alert-info mb-0">
+                <i class="fas fa-spinner fa-spin me-2"></i>正在啟動攝影機...
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div id="modelStatus" class="alert alert-secondary mb-0">
+                <i class="fas fa-hourglass-half me-2"></i>等待 AI 模型載入...
+              </div>
+            </div>
           </div> -->
+          <div class="row mt-3 status-row g-2 flex-nowrap justify-content-end" id="statusRow">
+            <div class="col-auto">
+                <div id="cameraStatus" class="alert alert-info mb-0">
+                    <i class="fas fa-spinner fa-spin me-2"></i>正在啟動攝影機...
+                </div>
+            </div>
+            <div class="col-auto">
+                <div id="modelStatus" class="alert alert-secondary mb-0">
+                    <i class="fas fa-hourglass-half me-2"></i>等待 AI 模型載入...
+                </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
 
-    <!-- 右側：學習狀態（把按鈕放這裡） -->
+    <!-- 右側：學習狀態 -->
     <div class="col-lg-4 right-panel">
       <div class="card mb-3 control-card" id="statusCard">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h5 class="mb-0"><i class="fas fa-tachometer-alt text-primary me-2"></i>學習狀態</h5>
+          <!-- ✅ 修改：移除暫停按鈕 -->
           <div class="d-flex gap-2">
-            <button id="startButton" class="btn btn-success btn-sm"><i class="fas fa-play me-1"></i>開始</button>
-            <button id="endButton" class="btn btn-danger btn-sm" disabled><i class="fas fa-stop me-1"></i>結束</button>
+            <button id="startButton" class="btn btn-success btn-sm" onclick="startSession()">
+              <i class="fas fa-play me-1"></i>開始
+            </button>
+            <button id="endButton" class="btn btn-danger btn-sm" disabled onclick="endSession()">
+              <i class="fas fa-stop me-1"></i>結束
+            </button>
           </div>
         </div>
         <div class="card-body">
@@ -86,22 +101,38 @@
       </div>
 
       <div class="card mb-3 control-card compact-card" id="statsCard" style="display:none;">
-        <div class="card-header py-2"><h5 class="mb-0"><i class="fas fa-chart-line text-primary me-2"></i>即時統計</h5></div>
+        <div class="card-header py-2">
+          <h5 class="mb-0"><i class="fas fa-chart-line text-primary me-2"></i>即時統計</h5>
+        </div>
         <div class="card-body py-2">
           <div class="row text-center">
-            <div class="col-12 mb-1"><small class="text-muted">平均專注度</small><div id="avgAttention" class="h5 text-primary mb-0">0%</div></div>
-            <div class="col-6"><small class="text-muted">檢測次數</small><div id="detectionCount" class="h6 mb-0">0</div></div>
-            <div class="col-6"><small class="text-muted">有效檢測</small><div id="validDetections" class="h6 mb-0">0</div></div>
+            <div class="col-12 mb-1">
+              <small class="text-muted">平均專注度</small>
+              <div id="avgAttention" class="h5 text-primary mb-0">0%</div>
+            </div>
+            <div class="col-6">
+              <small class="text-muted">檢測次數</small>
+              <div id="detectionCount" class="h6 mb-0">0</div>
+            </div>
+            <div class="col-6">
+              <small class="text-muted">有效檢測</small>
+              <div id="validDetections" class="h6 mb-0">0</div>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="card control-card" id="emotionCard" style="display:none;">
-        <div class="card-header"><h5 class="mb-0"><i class="fas fa-smile text-warning me-2"></i>即時情緒分析</h5></div>
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-smile text-warning me-2"></i>即時情緒分析</h5>
+        </div>
         <div class="card-body emotion-card-body">
           <div id="emotionLights" class="emotion-lights-container"></div>
           <div class="mt-2">
-            <small class="text-muted d-flex align-items-center"><i class="fas fa-info-circle me-1"></i><span>中性＝專注；無表情＝分心</span></small>
+            <small class="text-muted d-flex align-items-center">
+              <i class="fas fa-info-circle me-1"></i>
+              <span>中性＝專注；無表情＝分心</span>
+            </small>
           </div>
         </div>
       </div>
@@ -116,162 +147,491 @@
 .video-container{ position:relative; display:inline-block; border:4px solid #42a5f5; border-radius:15px; overflow:hidden; background:#000; box-shadow:0 8px 30px rgba(66,165,245,.3); }
 .video-container video{ display:block; width:360px; height:270px; object-fit:cover; }
 @media (min-width:1200px){ .video-container video{ width:420px; height:315px; } }
-@media (max-width:768px){ .course-video{ max-width:100%; } .video-container video{ width:100%; max-width:320px; height:auto; } }
+@media (max-width:768px){ 
+  .course-video{ max-width:100%; } 
+  .video-container video{ width:100%; max-width:320px; height:auto; } 
+}
 .video-main-card{ background:#f8f9fc; border:none; box-shadow:0 2px 12px rgba(0,0,0,.08); }
 .video-card-body{ background:#f8f9fc; padding:1.2rem; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:540px; }
 .control-card{ background:#fff; border:none; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
 .emotion-lights-container{ display:grid; grid-template-columns:repeat(auto-fit, minmax(80px,1fr)); gap:12px; padding:10px; }
 
-.ai-ready-pill{ white-space:nowrap; padding:10px 14px; border-radius:999px; background:#e8f5e9; color:#2e7d32; border:2px solid #a5d6a7; font-weight:600; display:flex; align-items:center; }
-#cameraStatus.alert-info, #cameraStatus.alert-success, #cameraStatus.alert-danger{ max-width:600px; margin:0 auto; }
+/* ✅ 新增：雙狀態顯示樣式
+.status-row {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.status-row .alert {
+  font-size: 0.9rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+} */
+
+.status-row {
+  margin: 0 auto;
+  width: 420px;          /* 先給預設寬，啟動相機後會用 JS 等比覆寫 */
+}
+
+/* 單一框不換行、略放大，避免「已就緒」被折行 */
+.status-row .alert {
+  white-space: nowrap;
+  font-size: 0.95rem;
+  padding: 0.8rem 1rem;
+  min-width: 230px;      /* 讓「AI 模型已就緒」保證一行 */
+  border-radius: 10px;
+}
+
+.status-row .alert i {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .status-row {
+    margin-top: 1rem;
+  }
+  .status-row .col-md-6 {
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* 相機與警告區域的固定佈局 */
+.camera-warning-wrapper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin: 0 auto;
+  max-width: 800px;
+}
+
+.side-warning-area {
+  width: 300px;
+  min-height: 270px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.side-warning-area #detectionWarning {
+  width: 100%;
+  margin: 0;
+  padding: 1rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (min-width:1200px) {
+  .side-warning-area { min-height: 315px; }
+}
+
+@media (max-width:768px) {
+  .camera-warning-wrapper {
+    flex-direction: column;
+    align-items: center;
+  }
+  .side-warning-area {
+    width: 100%;
+    max-width: 320px;
+    min-height: auto;
+    margin-top: 1rem;
+  }
+}
+
+/* Emotion lights 樣式 */
+.emotion-light-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  opacity: 0.3;
+  background: rgba(0,0,0,0.02);
+}
+
+.emotion-light-item.active {
+  transform: scale(1.15);
+  opacity: 1;
+  animation: pulse 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1.15); }
+  50% { transform: scale(1.25); }
+}
+
+.emotion-light-item i {
+  transition: all 0.3s ease;
+}
+
+.emotion-label {
+  font-size: 0.75rem;
+  margin-top: 6px;
+  font-weight: 600;
+  color: #2c3e50;
+}
 </style>
 
 <script>
-const SUBJECT='{{ subject }}';
-const DASHBOARD_URL='{{ url_for("dashboard") }}';
-let SESSION_ID=null, WATCH_ID=null;
-let POMODORO_ON=true, pomodoroTimer=null, pomodoroMins=25;
-let elapsedTimer=null, startedAt=null;
+// ===== 全域變數 =====
+const SUBJECT = '{{ subject }}';
+const DASHBOARD_URL = '{{ url_for("dashboard") }}';
+let CURRENT_SESSION_ID = null;
+let WATCH_ID = null;
+let POMODORO_ON = true;
+let pomodoroTimer = null;
+const POMODORO_MINS = 25;
+let elapsedTimer = null;
+let startedAt = null;
 let videos = [];
 
-// === 相機 ===
-async function openCamera(){
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
-    const videoEl = document.getElementById('video');
-    videoEl.srcObject = stream;
-    document.getElementById('cameraStatus').className='alert alert-success mt-3';
-    document.getElementById('cameraStatus').innerHTML='<i class="fas fa-check-circle me-2"></i>攝影機已啟動';
-    document.getElementById('aiReadyPill').style.display='';
-  }catch(e){
-    document.getElementById('cameraStatus').className='alert alert-danger mt-3';
-    document.getElementById('cameraStatus').innerHTML='<i class="fas fa-times-circle me-2"></i>無法啟動攝影機：'+e.message;
-  }
+// ===== 時間顯示函式 =====
+function mmss(sec) {
+  const m = Math.floor(sec / 60).toString().padStart(2, '0');
+  const s = Math.floor(sec % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
 }
 
-// === 時間顯示 ===
-function mmss(sec){ const m = Math.floor(sec/60).toString().padStart(2,'0'); const s = Math.floor(sec%60).toString().padStart(2,'0'); return `${m}:${s}`; }
-function startElapsed(){
+function startElapsed() {
   startedAt = Date.now();
   const label = document.getElementById('elapsedText');
-  elapsedTimer = setInterval(()=>{ label.textContent = mmss((Date.now()-startedAt)/1000); }, 1000);
+  elapsedTimer = setInterval(() => {
+    if (label) {
+      label.textContent = mmss((Date.now() - startedAt) / 1000);
+    }
+  }, 1000);
 }
-function stopElapsed(){ if(elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer=null; } }
 
-// === 番茄鐘 ===
-function startPomodoro(){ stopPomodoro(); if(!POMODORO_ON) return;
-  pomodoroTimer = setTimeout(()=>{ alert('已學習 25 分鐘，要繼續嗎？'); startPomodoro(); }, pomodoroMins*60*1000);
+function stopElapsed() {
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
 }
-function stopPomodoro(){ if(pomodoroTimer){ clearTimeout(pomodoroTimer); pomodoroTimer=null; } }
 
-// === 讀取影片清單（供下拉選） ===
-async function fetchVideos(){
-  const res = await fetch(`/api/videos/${SUBJECT}`);
-  const data = await res.json();
+// ===== 番茄鐘 =====
+function startPomodoro() {
+  stopPomodoro();
+  if (!POMODORO_ON) return;
+  pomodoroTimer = setTimeout(() => {
+    alert(`已學習 ${POMODORO_MINS} 分鐘，要繼續嗎？`);
+    startPomodoro();
+  }, POMODORO_MINS * 60 * 1000);
+}
+
+function stopPomodoro() {
+  if (pomodoroTimer) {
+    clearTimeout(pomodoroTimer);
+    pomodoroTimer = null;
+  }
+}
+
+// ===== 相機初始化 =====
+async function openCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, facingMode: 'user' },
+      audio: false
+    });
+    const videoEl = document.getElementById('video');
+    videoEl.srcObject = stream;
+    
+    // ✅ 修改：更新相機狀態（獨立顯示）
+    const status = document.getElementById('cameraStatus');
+    status.className = 'alert alert-success mb-0';
+    status.innerHTML = '<i class="fas fa-check-circle me-2"></i>攝影機已啟動';
+    
+    // 通知 script.js 相機已就緒
+    if (typeof window.onCameraReady === 'function') {
+      window.onCameraReady();
+    }
+  } catch (e) {
+    const status = document.getElementById('cameraStatus');
+    status.className = 'alert alert-danger mb-0';
+    status.innerHTML = '<i class="fas fa-times-circle me-2"></i>攝影機啟動失敗：' + e.message;
+    
+    // 通知 script.js 相機失敗
+    if (typeof window.onCameraError === 'function') {
+      window.onCameraError();
+    }
+  }
+}
+
+// ===== 讀取影片清單 =====
+async function fetchVideos() {
+  try {
+    const res = await fetch(`/api/videos/${SUBJECT}`);
+    const data = await res.json();
+    const sel = document.getElementById('videoSelect');
+    sel.innerHTML = '';
+    
+    videos = data.ok ? data.videos : [];
+    
+    if (!data.ok || videos.length === 0) {
+      const opt = document.createElement('option');
+      opt.textContent = '目前沒有影片';
+      opt.disabled = true;
+      opt.selected = true;
+      sel.appendChild(opt);
+      return;
+    }
+    
+    for (const v of videos) {
+      const opt = document.createElement('option');
+      opt.value = v.filename;
+      opt.textContent = v.display_name;
+      opt.dataset.url = v.url;
+      sel.appendChild(opt);
+    }
+  } catch (err) {
+    console.error('讀取影片清單失敗:', err);
+  }
+}
+
+// ===== 切換影片 =====
+async function startVideoBySelect() {
   const sel = document.getElementById('videoSelect');
-  sel.innerHTML='';
-  videos = data.ok ? data.videos : [];
-  if(!data.ok || videos.length===0){
-    const opt = document.createElement('option');
-    opt.textContent = '目前沒有影片';
-    opt.disabled = true; opt.selected = true;
-    sel.appendChild(opt);
+  if (!CURRENT_SESSION_ID) {
+    alert('請先點「開始」再選影片');
     return;
   }
-  for(const v of videos){
-    const opt = document.createElement('option');
-    opt.value = v.filename;
-    opt.textContent = v.display_name;
-    opt.dataset.url = v.url;
-    sel.appendChild(opt);
-  }
-}
-
-// === 切換影片（開始看 / 結束上支） ===
-async function startVideoBySelect(){
-  const sel = document.getElementById('videoSelect');
-  if(!SESSION_ID){ alert('請先點「開始」再選影片'); return; }
+  
   const opt = sel.options[sel.selectedIndex];
-  const filename = opt.value, displayName = opt.textContent, url = opt.dataset.url;
+  const filename = opt.value;
+  const displayName = opt.textContent;
+  const url = opt.dataset.url;
 
-  // 結束上一支
-  if(WATCH_ID){
-    try{ await fetch('/api/video/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watch_id:WATCH_ID})}); }catch(_){}
-    WATCH_ID=null;
+  // 結束上一支影片
+  if (WATCH_ID) {
+    try {
+      await fetch('/api/video/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ watch_id: WATCH_ID })
+      });
+    } catch (err) {
+      console.error('結束影片失敗:', err);
+    }
+    WATCH_ID = null;
   }
-  // 通知後端開始看這支
-  const res = await fetch('/api/video/start',{
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ session_id: SESSION_ID, subject: SUBJECT,
-                           video_filename: filename, video_display_name: displayName })
-  });
-  const data = await res.json();
-  if(!data.ok){ alert('無法開始此影片'); return; }
-  WATCH_ID = data.watch_id;
+  
+  // 開始新影片
+  try {
+    const res = await fetch('/api/video/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: CURRENT_SESSION_ID,
+        subject: SUBJECT,
+        video_filename: filename,
+        video_display_name: displayName
+      })
+    });
+    
+    const data = await res.json();
+    if (!data.ok) {
+      alert('無法開始此影片');
+      return;
+    }
+    
+    WATCH_ID = data.watch_id;
 
-  // 設定播放器
-  const box = document.getElementById('courseBox');
-  const title = document.getElementById('courseTitle');
-  const src = document.getElementById('courseSrc');
-  const player = document.getElementById('courseVideo');
-  title.textContent = displayName; src.src = url; player.load(); box.style.display=''; player.play();
-  player.onended = async ()=>{ if(WATCH_ID){ try{ await fetch('/api/video/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watch_id:WATCH_ID})}); }catch(_){}
-                              WATCH_ID=null; } };
+    // 設定播放器
+    const box = document.getElementById('courseBox');
+    const title = document.getElementById('courseTitle');
+    const src = document.getElementById('courseSrc');
+    const player = document.getElementById('courseVideo');
+    
+    title.textContent = displayName;
+    src.src = url;
+    player.load();
+    box.style.display = 'block';
+    player.play();
+    
+    player.onended = async () => {
+      if (WATCH_ID) {
+        try {
+          await fetch('/api/video/end', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ watch_id: WATCH_ID })
+          });
+        } catch (err) {
+          console.error('影片結束記錄失敗:', err);
+        }
+        WATCH_ID = null;
+      }
+    };
+  } catch (err) {
+    console.error('開始影片失敗:', err);
+    alert('開始影片時發生錯誤');
+  }
 }
 
-// === 開始 / 結束 一場學習 ===
-async function startSession(){
-  const res = await fetch('/api/session/start',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ subject: SUBJECT }) });
-  const data = await res.json();
-  if(!data.ok){ alert('無法開始學習：'+(data.error||'')); return; }
-  SESSION_ID = data.session_id;
+// ===== 開始學習 =====
+async function startSession() {
+  try {
+    const res = await fetch('/api/session/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subject: SUBJECT
+      })
+    });
+    
+    const data = await res.json();
+    
+    if (!data.ok) {
+      alert('無法開始學習：' + (data.error || ''));
+      return;
+    }
+    
+    CURRENT_SESSION_ID = data.session_id;
+    console.log('✓ 學習階段開始，ID:', CURRENT_SESSION_ID);
 
-  // UI
-  document.getElementById('statsCard').style.display='';
-  document.getElementById('emotionCard').style.display='';
-  document.getElementById('startButton').disabled = true;
-  document.getElementById('endButton').disabled = false;
-  document.getElementById('videoSelect').disabled = false;
+    // 更新 UI
+    document.getElementById('statsCard').style.display = 'block';
+    document.getElementById('emotionCard').style.display = 'block';
+    document.getElementById('startButton').disabled = true;
+    document.getElementById('endButton').disabled = false;
+    document.getElementById('videoSelect').disabled = false;
 
-  startElapsed(); startPomodoro();
+    startElapsed();
+    startPomodoro();
 
-  // 如果下拉有值，預設開第一支
-  const sel = document.getElementById('videoSelect');
-  if(sel.options.length>0 && !sel.options[0].disabled){
-    sel.selectedIndex = 0;
-    await startVideoBySelect();
+    // 如果有影片，預設選第一支
+    const sel = document.getElementById('videoSelect');
+    if (sel.options.length > 0 && !sel.options[0].disabled) {
+      sel.selectedIndex = 0;
+      await startVideoBySelect();
+    }
+
+    // 通知 script.js 開始偵測
+    if (typeof window.startDetection === 'function') {
+      window.startDetection();
+    } else {
+      console.warn('⚠ script.js 的 startDetection 函式尚未載入');
+    }
+  } catch (err) {
+    console.error('✗ 開始學習失敗:', err);
+    alert('開始學習時發生錯誤');
   }
-
-  // ✅ 若你的情緒偵測起迴圈是寫在 script.js，這裡用事件觸發它
-  document.dispatchEvent(new Event('study-session-started'));
 }
 
-async function endSession(){
-  stopElapsed(); stopPomodoro();
+// ===== 結束學習 =====
+async function endSession() {
+  stopElapsed();
+  stopPomodoro();
 
-  if(WATCH_ID){
-    try{ await fetch('/api/video/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watch_id:WATCH_ID})}); }catch(_){}
-    WATCH_ID=null;
+  // 先結束影片
+  if (WATCH_ID) {
+    try {
+      await fetch('/api/video/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ watch_id: WATCH_ID })
+      });
+    } catch (err) {
+      console.error('結束影片失敗:', err);
+    }
+    WATCH_ID = null;
   }
-  if(SESSION_ID){
-    try{ await fetch('/api/session/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:SESSION_ID})}); }catch(_){}
-    SESSION_ID=null;
+  
+  // 結束學習階段
+  if (CURRENT_SESSION_ID) {
+    try {
+      const res = await fetch('/api/session/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: CURRENT_SESSION_ID })
+      });
+      
+      const data = await res.json();
+      console.log('✓ 結束學習 API 回應:', data);
+      
+      if (!data.ok) {
+        alert('結束學習失敗：' + (data.error || ''));
+        return;
+      }
+      
+      // 通知 script.js 停止偵測
+      if (typeof window.stopDetection === 'function') {
+        window.stopDetection();
+      }
+      
+      CURRENT_SESSION_ID = null;
+      window.location.href = DASHBOARD_URL;
+      
+    } catch (err) {
+      console.error('✗ 結束學習請求失敗:', err);
+      alert('網路錯誤：' + err.message);
+    }
+  } else {
+    alert('找不到學習階段 ID');
   }
-  document.dispatchEvent(new Event('study-session-ended'));    // ✅ 讓 script.js 停止偵測
-  // 回到儀表板
-  window.location.href = DASHBOARD_URL;
 }
 
-document.addEventListener('DOMContentLoaded', async ()=>{
-  openCamera();
+// ===== 頁面初始化 =====
+document.addEventListener('DOMContentLoaded', async () => {
+  await openCamera();
   await fetchVideos();
-
-  document.getElementById('startButton').addEventListener('click', startSession);
-  document.getElementById('endButton').addEventListener('click', endSession);
-  document.getElementById('videoSelect').addEventListener('change', startVideoBySelect);
-  document.getElementById('pomodoroSwitch').addEventListener('change', (e)=>{
-    POMODORO_ON = e.target.checked; if(POMODORO_ON) startPomodoro(); else stopPomodoro();
-  });
+  
+  // 綁定事件
+  const videoSelect = document.getElementById('videoSelect');
+  if (videoSelect) {
+    videoSelect.addEventListener('change', startVideoBySelect);
+  }
+  
+  const pomodoroSwitch = document.getElementById('pomodoroSwitch');
+  if (pomodoroSwitch) {
+    pomodoroSwitch.addEventListener('change', (e) => {
+      POMODORO_ON = e.target.checked;
+      if (POMODORO_ON) {
+        startPomodoro();
+      } else {
+        stopPomodoro();
+      }
+    });
+  }
+  
+  console.log('✓ study.html 初始化完成');
 });
+
+function alignStatusWithVideo() {
+  const videoEl = document.getElementById('video');
+  const row = document.getElementById('statusRow');
+  if (!videoEl || !row) return;
+
+  const vRect = videoEl.getBoundingClientRect();
+  const parentRect = row.parentElement.getBoundingClientRect();
+
+  // 寬度 = 視訊寬；左邊距 = 視訊相對於父容器的左距
+  row.style.width = `${vRect.width}px`;
+  row.style.marginLeft = `${vRect.left - parentRect.left}px`;
+}
+
+window.addEventListener('resize', alignStatusWithVideo);
+
+// 已在 script.js 暴露 onCameraReady/onCameraError；呼叫時一起做對齊
+const _origOnCameraReady = window.onCameraReady;
+window.onCameraReady = function() {
+  if (typeof _origOnCameraReady === 'function') _origOnCameraReady();
+  setTimeout(alignStatusWithVideo, 0);   // 等 DOM layout 完成再對齊
+};
+
 </script>
+
+<!-- 載入 script.js（情緒偵測邏輯） -->
+<script src="{{ url_for('static', filename='script.js') }}"></script>
 {% endblock %}

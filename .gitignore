@@ -17,6 +17,6 @@ instance/
 .idea/
 .vscode/
 
-# Generated outputs (可依需要調整)
+# Generated outputs (adjust as needed)
 reports/*.pdf
 reports/*.html

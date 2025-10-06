@@ -37,21 +37,11 @@
                 <p class="mb-0">總學習時數</p>
             </div>
         </div>
+
         <div class="col-md-3 mb-3">
             <div class="stats-card">
                 <i class="fas fa-brain"></i>
-                <h4>
-                    {% if study_sessions %}
-                        {% set attention_sessions = study_sessions | selectattr('avg_attention') | list %}
-                        {% if attention_sessions %}
-                            {{ "%.0f" | format((attention_sessions | map(attribute='avg_attention') | sum / attention_sessions|length) * 100 / 3) }}%
-                        {% else %}
-                            --
-                        {% endif %}
-                    {% else %}
-                        --
-                    {% endif %}
-                </h4>
+                <h4>{{ overall_avg_attention }}%</h4>
                 <p class="mb-0">平均專注度</p>
             </div>
         </div>
@@ -59,8 +49,18 @@
             <div class="stats-card">
                 <i class="fas fa-trophy"></i>
                 <h4>
-                    {% if chart_data.subjects %}
-                        {{ chart_data.subjects[0] }}
+                    {% if chart_data.subjects and chart_data.subjects|length > 0 %}
+                        {% set subject_counts = {} %}
+                        {% for session in study_sessions %}
+                            {% if session.subject in subject_counts %}
+                                {% set _ = subject_counts.__setitem__(session.subject, subject_counts[session.subject] + 1) %}
+                            {% else %}
+                                {% set _ = subject_counts.__setitem__(session.subject, 1) %}
+                            {% endif %}
+                        {% endfor %}
+                        {% set max_count = subject_counts.values()|max %}
+                        {% set most_studied = subject_counts.items()|selectattr('1', 'equalto', max_count)|map(attribute='0')|first %}
+                        {{ {'math': '數學', 'science': '自然科學', 'language': '語言文學', 'social': '社會科學', 'art': '藝術創作', 'cs': '電腦科學'}[most_studied] }}
                     {% else %}
                         --
                     {% endif %}
@@ -185,7 +185,7 @@
                                     </td>
                                     <td>{{ session.duration_minutes }} 分鐘</td>
                                     <td>
-                                        {% if session.avg_attention %}
+                                        {% if session.avg_attention is not none %}
                                             <div class="progress" style="height: 20px;">
                                                 <div class="progress-bar 
                                                     {% if session.avg_attention >= 2.5 %}bg-success
@@ -475,6 +475,52 @@ async function deleteStudySession(sessionId) {
     }
 }
 
+// // 科目學習時間分布圖
+// if (chartData.subjects && chartData.subjects.length > 0) {
+//     const subjectTimeCtx = document.getElementById('subjectTimeChart').getContext('2d');
+//     new Chart(subjectTimeCtx, {
+//         type: 'pie',
+//         data: {
+//             labels: chartData.subjects,
+//             datasets: [{
+//                 data: chartData.study_times,
+//                 backgroundColor: [
+//                     '#42a5f5',
+//                     '#66bb6a',
+//                     '#ef5350',
+//                     '#ffb74d',
+//                     '#ab47bc',
+//                     '#26c6da'
+//                 ],
+//                 borderWidth: 2,
+//                 borderColor: '#fff'
+//             }]
+//         },
+//         options: {
+//             responsive: true,
+//             maintainAspectRatio: false,
+//             plugins: {
+//                 legend: {
+//                     position: 'bottom',
+//                     labels: {
+//                         padding: 12,
+//                         font: {
+//                             size: 11
+//                         }
+//                     }
+//                 },
+//                 tooltip: {
+//                     callbacks: {
+//                         label: function(context) {
+//                             return context.label + ': ' + context.parsed + ' 分鐘';
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     });
+// }
+
 // 科目學習時間分布圖
 if (chartData.subjects && chartData.subjects.length > 0) {
     const subjectTimeCtx = document.getElementById('subjectTimeChart').getContext('2d');
@@ -484,14 +530,7 @@ if (chartData.subjects && chartData.subjects.length > 0) {
             labels: chartData.subjects,
             datasets: [{
                 data: chartData.study_times,
-                backgroundColor: [
-                    '#42a5f5',
-                    '#66bb6a',
-                    '#ef5350',
-                    '#ffb74d',
-                    '#ab47bc',
-                    '#26c6da'
-                ],
+                backgroundColor: chartData.subject_colors,
                 borderWidth: 2,
                 borderColor: '#fff'
             }]
@@ -531,11 +570,7 @@ if (chartData.subjects && chartData.subjects.length > 0) {
             datasets: [{
                 label: '平均專注度 (%)',
                 data: chartData.attention_scores,
-                backgroundColor: chartData.attention_scores.map(score => {
-                    if (score >= 80) return '#66bb6a';
-                    if (score >= 60) return '#ffb74d';
-                    return '#ef5350';
-                }),
+                backgroundColor: chartData.subject_colors,  // 使用科目對應的顏色
                 borderWidth: 0
             }]
         },
