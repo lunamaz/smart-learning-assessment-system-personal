@@ -286,18 +286,72 @@
     }
 
     {% if session.child_nickname %}
-    // 更新小孩資料
+    // ===== 載入小孩資料到編輯表單 =====
+    document.addEventListener('DOMContentLoaded', function() {
+        const editChildModal = document.getElementById('editChildModal');
+        if (editChildModal) {
+            editChildModal.addEventListener('show.bs.modal', async function() {
+                try {
+                    // 從後端取得最新資料
+                    const response = await fetch('/get_child_profile/{{ session.child_id }}');
+                    const result = await response.json();
+                
+                    if (result.success) {
+                        const child = result.child;
+                        document.getElementById('editChildNickname').value = child.nickname;
+                        document.getElementById('editChildAge').value = child.age;
+                        document.getElementById('editEducationStage').value = child.education_stage;
+                    
+                        // 設定性別單選按鈕
+                        if (child.gender === 'male') {
+                            document.getElementById('editMale').checked = true;
+                        } else {
+                            document.getElementById('editFemale').checked = true;
+                        }
+                    }
+                } catch (error) {
+                    console.error('載入小孩資料失敗:', error);
+                }
+            });
+        }
+    });
+
+    // ===== 修正：更新小孩資料函數 =====
     async function updateChildProfile() {
-        const nickname = document.getElementById('editChildNickname').value;
-        const gender = document.querySelector('input[name="editGender"]:checked').value;
-        const age = parseInt(document.getElementById('editChildAge').value);
+        const nickname = document.getElementById('editChildNickname').value.trim();
+        const gender = document.querySelector('input[name="editGender"]:checked')?.value;
+        const ageInput = document.getElementById('editChildAge');
+        const age = parseInt(ageInput.value);
         const educationStage = document.getElementById('editEducationStage').value;
-        
-        if (age < 6 || age > 18) {
-            alert('年齡必須在6-18歲之間');
+    
+        // 前端驗證
+        if (!nickname) {
+            alert('請輸入暱稱');
             return;
         }
-        
+    
+        if (!gender) {
+            alert('請選擇性別');
+            return;
+        }
+    
+        if (isNaN(age) || age < 6 || age > 18) {
+            alert('年齡必須在 6-18 歲之間');
+            ageInput.focus();
+            return;
+        }
+    
+        if (!educationStage) {
+            alert('請選擇教育階段');
+            return;
+        }
+    
+        // 顯示載入中
+        const updateBtn = event.target;
+        const originalText = updateBtn.innerHTML;
+        updateBtn.disabled = true;
+        updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>更新中...';
+    
         try {
             const response = await fetch('/update_child_profile', {
                 method: 'POST',
@@ -312,40 +366,49 @@
                     education_stage: educationStage
                 })
             });
-            
+        
             const result = await response.json();
-            
+        
             if (result.success) {
-                alert('小孩資料更新成功！');
+                // 成功提示
+                alert(result.message || '小孩資料更新成功！');
+            
+                // 關閉 Modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editChildModal'));
+                modal.hide();
+            
+                // 重新載入頁面以更新顯示
                 location.reload();
             } else {
-                alert('更新失敗：' + result.message);
+                alert('更新失敗：' + (result.message || '未知錯誤'));
             }
         } catch (error) {
-            alert('更新失敗，請稍後再試');
+            console.error('更新失敗:', error);
+            alert('網路錯誤，請稍後再試');
+        } finally {
+            // 恢復按鈕狀態
+            updateBtn.disabled = false;
+            updateBtn.innerHTML = originalText;
         }
     }
 
-    // 年齡輸入驗證 - 修正只驗證範圍
+    // ===== 年齡輸入驗證 =====
     document.addEventListener('DOMContentLoaded', function() {
         const ageInput = document.getElementById('editChildAge');
         if (ageInput) {
             ageInput.addEventListener('blur', function() {
                 const age = parseInt(this.value);
                 if (isNaN(age) || age < 6 || age > 18) {
-                    this.setCustomValidity('年齡必須在6-18歲之間');
+                    this.setCustomValidity('年齡必須在 6-18 歲之間');
                     this.reportValidity();
                 } else {
                     this.setCustomValidity('');
                 }
             });
-            
+        
             // 防止輸入非數字
             ageInput.addEventListener('keypress', function(e) {
-                // 允許退格鍵、刪除鍵等控制鍵
                 if (e.which === 8 || e.which === 0) return;
-                
-                // 只允許數字
                 if (e.which < 48 || e.which > 57) {
                     e.preventDefault();
                 }

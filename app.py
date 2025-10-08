@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file, send_from_directory
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file, send_from_directory, g
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from datetime import datetime, timedelta, timezone
 
 import json
@@ -104,9 +105,32 @@ from io import BytesIO
 import base64
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///learning_system.db'
+
+# ===== 關鍵修改：Session 設定 =====
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-this')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Session 24 小時後過期
+app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # 防止 XSS
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF 保護
+
+# ===== 資料庫設定（支援 PostgreSQL 和 SQLite）=====
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    # Render PostgreSQL URL 格式修正
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    print(f"✓ 使用 PostgreSQL 資料庫")
+else:
+    # 本地開發用 SQLite
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///learning_system.db'
+    print("⚠ 使用 SQLite（僅供本地開發）")
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,  # 自動檢測斷線
+    'pool_recycle': 300,    # 5 分鐘回收連線
+}
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
@@ -349,10 +373,9 @@ def index():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    """註冊功能"""
+    """註冊功能（強化版）"""
     if request.method == 'POST':
         try:
-            # 獲取 JSON 數據
             data = request.get_json()
             if not data:
                 return jsonify({'success': False, 'message': '無效的請求數據'}), 400
@@ -385,8 +408,8 @@ def register():
             try:
                 password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
             except Exception as hash_error:
-                print(f'密碼哈希失敗: {hash_error}')
-                return jsonify({'success': False, 'message': '密碼處理失敗，請稍後再試'}), 500
+                print(f'✗ 密碼哈希失敗: {hash_error}')
+                return jsonify({'success': False, 'message': '密碼處理失敗'}), 500
             
             # 創建新使用者
             user = User(
@@ -395,12 +418,17 @@ def register():
                 password_hash=password_hash
             )
             
-            # 儲存到資料庫
-            db.session.add(user)
-            db.session.commit()
-            
-            print(f'✓ 新使用者註冊成功: {username}')
-            return jsonify({'success': True, 'message': '註冊成功'}), 200
+            # 儲存到資料庫（加強錯誤處理）
+            try:
+                db.session.add(user)
+                db.session.commit()
+                print(f'✓ 新使用者註冊成功: {username} (ID: {user.id})')
+                return jsonify({'success': True, 'message': '註冊成功'}), 200
+                
+            except SQLAlchemyError as db_error:
+                db.session.rollback()
+                print(f'✗ 資料庫寫入失敗: {db_error}')
+                return jsonify({'success': False, 'message': '註冊失敗，資料庫錯誤'}), 500
             
         except Exception as e:
             db.session.rollback()
@@ -409,36 +437,13 @@ def register():
             traceback.print_exc()
             return jsonify({'success': False, 'message': '註冊失敗，請稍後再試'}), 500
     
-    # GET 請求返回註冊頁面
     return render_template('register.html')
-
-'''
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        data = request.get_json()
-        username = data.get('username')
-        email = data.get('email')
-        password = data.get('password')
-
-        if User.query.filter_by(username=username).first():
-            return jsonify({'success': False, 'message': '使用者名稱已存在'})
-        if User.query.filter_by(email=email).first():
-            return jsonify({'success': False, 'message': '電子郵件已註冊'})
-
-        password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-        user = User(username=username, email=email, password_hash=password_hash)
-        db.session.add(user)
-        db.session.commit()
-        return jsonify({'success': True, 'message': '註冊成功'})
-    return render_template('register.html')'''
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """登入功能"""
+    """登入功能（修正版）"""
     if request.method == 'POST':
         try:
-            # 獲取 JSON 數據
             data = request.get_json()
             if not data:
                 return jsonify({'success': False, 'message': '無效的請求數據'}), 400
@@ -446,7 +451,6 @@ def login():
             username = data.get('username', '').strip()
             password = data.get('password', '')
             
-            # 基本驗證
             if not username or not password:
                 return jsonify({'success': False, 'message': '請輸入使用者名稱和密碼'}), 400
             
@@ -454,21 +458,27 @@ def login():
             user = User.query.filter_by(username=username).first()
             
             if not user:
+                print(f"✗ 登入失敗：使用者 {username} 不存在")
                 return jsonify({'success': False, 'message': '使用者名稱或密碼錯誤'}), 401
             
             # 驗證密碼
             try:
                 password_valid = bcrypt.check_password_hash(user.password_hash, password)
             except Exception as check_error:
-                print(f'密碼驗證失敗: {check_error}')
+                print(f'✗ 密碼驗證失敗: {check_error}')
                 return jsonify({'success': False, 'message': '登入驗證失敗'}), 500
             
             if password_valid:
+                # ===== 關鍵修改：設定 Session =====
+                session.permanent = True  # 啟用持久化（使用 PERMANENT_SESSION_LIFETIME）
                 session['user_id'] = user.id
                 session['username'] = user.username
-                print(f'✓ 使用者登入成功: {username}')
+                session['login_time'] = datetime.now().isoformat()  # 記錄登入時間
+                
+                print(f'✓ 使用者登入成功: {username} (ID: {user.id})')
                 return jsonify({'success': True, 'message': '登入成功'}), 200
             else:
+                print(f"✗ 登入失敗：密碼錯誤 ({username})")
                 return jsonify({'success': False, 'message': '使用者名稱或密碼錯誤'}), 401
                 
         except Exception as e:
@@ -477,25 +487,46 @@ def login():
             traceback.print_exc()
             return jsonify({'success': False, 'message': '登入失敗，請稍後再試'}), 500
     
-    # GET 請求返回登入頁面
     return render_template('login.html')
 
-'''
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
+@app.route('/logout')
+def logout():
+    """登出功能（修正版）"""
+    username = session.get('username', '未知')
+    
+    # 完全清除 session
+    session.clear()
+    
+    print(f'✓ 使用者已登出: {username}')
+    return redirect(url_for('index'))
 
-        user = User.query.filter_by(username=username).first()
-        if user and bcrypt.check_password_hash(user.password_hash, password):
-            session['user_id'] = user.id
-            session['username'] = user.username
-            return jsonify({'success': True, 'message': '登入成功'})
-        else:
-            return jsonify({'success': False, 'message': '使用者名稱或密碼錯誤'})
-    return render_template('login.html')'''
+# ===== 新增：檢查 Session 有效性 =====
+@app.before_request
+def before_request():
+    """每個請求前確保資料庫連線正常"""
+    try:
+        # 測試資料庫連線
+        db.session.execute('SELECT 1')
+    except OperationalError as e:
+        print(f"✗ 資料庫連線失敗: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': '資料庫連線失敗，請稍後再試'}), 503
+    
+def check_session():
+    """每個請求前檢查 Session 是否有效"""
+    if 'user_id' in session:
+        # 檢查登入時間，超過 24 小時自動登出
+        login_time_str = session.get('login_time')
+        if login_time_str:
+            try:
+                login_time = datetime.fromisoformat(login_time_str)
+                if datetime.now() - login_time > timedelta(hours=24):
+                    print(f"⚠ Session 過期，自動登出使用者: {session.get('username')}")
+                    session.clear()
+                    if request.endpoint not in ['index', 'login', 'register', 'static']:
+                        return redirect(url_for('login'))
+            except:
+                pass
 
 @app.route('/child_selection')
 def child_selection():
@@ -1045,6 +1076,27 @@ def get_calendar_data():
 
     return jsonify({'success': True, 'data': calendar_data})
 
+@app.route('/get_child_profile/<int:child_id>')
+def get_child_profile(child_id):
+    """取得小孩資料 API"""
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': '請先登入'}), 401
+    
+    child = Child.query.filter_by(id=child_id, user_id=session['user_id']).first()
+    if not child:
+        return jsonify({'success': False, 'message': '找不到小孩檔案'}), 404
+    
+    return jsonify({
+        'success': True,
+        'child': {
+            'id': child.id,
+            'nickname': child.nickname,
+            'gender': child.gender,
+            'age': child.age,
+            'education_stage': child.education_stage
+        }
+    }), 200
+
 @app.route('/data_analysis')
 def data_analysis():
     if 'user_id' not in session or 'child_id' not in session:
@@ -1400,41 +1452,88 @@ def update_user_profile():
 
 @app.route('/update_child_profile', methods=['POST'])
 def update_child_profile():
+    """更新小孩資料（修正版）"""
     if 'user_id' not in session:
-        return jsonify({'success': False, 'message': '請先登入'})
+        return jsonify({'success': False, 'message': '請先登入'}), 401
 
-    data = request.get_json()
-    child_id = data.get('child_id')
-    child = Child.query.filter_by(id=child_id, user_id=session['user_id']).first()
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': '無效的請求數據'}), 400
+        
+        child_id = data.get('child_id')
+        if not child_id:
+            return jsonify({'success': False, 'message': '缺少小孩 ID'}), 400
+        
+        child = Child.query.filter_by(id=child_id, user_id=session['user_id']).first()
+        if not child:
+            return jsonify({'success': False, 'message': '找不到小孩檔案'}), 404
 
-    if child:
+        # ===== 修正：取得並驗證所有欄位 =====
+        nickname = data.get('nickname', '').strip()
+        gender = data.get('gender', '').strip()
         age = data.get('age')
+        education_stage = data.get('education_stage', '').strip()
+        
+        # 驗證必填欄位
+        if not nickname:
+            return jsonify({'success': False, 'message': '請輸入暱稱'}), 400
+        
+        if not gender or gender not in ['male', 'female']:
+            return jsonify({'success': False, 'message': '請選擇性別'}), 400
+        
+        if not education_stage or education_stage not in ['elementary', 'middle', 'high']:
+            return jsonify({'success': False, 'message': '請選擇教育階段'}), 400
+        
+        # 驗證年齡
         try:
             age = int(age)
             if age < 6 or age > 18:
-                return jsonify({'success': False, 'message': '年齡必須在6-18歲之間'})
+                return jsonify({'success': False, 'message': '年齡必須在 6-18 歲之間'}), 400
         except (ValueError, TypeError):
-            return jsonify({'success': False, 'message': '請輸入有效的年齡'})
+            return jsonify({'success': False, 'message': '請輸入有效的年齡'}), 400
 
-        child.nickname = data.get('nickname')
-        child.gender = data.get('gender')
+        # ===== 更新資料 =====
+        old_data = {
+            'nickname': child.nickname,
+            'gender': child.gender,
+            'age': child.age,
+            'education_stage': child.education_stage
+        }
+        
+        child.nickname = nickname
+        child.gender = gender
         child.age = age
-        child.education_stage = data.get('education_stage')
+        child.education_stage = education_stage
 
+        # 清除 AI 建議和報告（因為基本資料改變）
         child.ai_suggestion = None
         if child.pdf_report_path and os.path.exists(child.pdf_report_path):
             try:
                 os.remove(child.pdf_report_path)
-            except:
-                pass
+            except Exception as e:
+                print(f"⚠ 無法刪除舊報告: {e}")
         child.pdf_report_path = None
         child.pdf_generated_at = None
 
         db.session.commit()
+        
+        # 更新 session
         if session.get('child_id') == child_id:
             session['child_nickname'] = child.nickname
-        return jsonify({'success': True, 'message': '小孩資料更新成功'})
-    return jsonify({'success': False, 'message': '找不到小孩檔案'})
+        
+        print(f'✓ 小孩資料更新成功: {old_data} → {data}')
+        return jsonify({
+            'success': True, 
+            'message': f'{nickname} 的資料已更新成功！'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f'✗ 更新小孩資料失敗: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': '更新失敗，請稍後再試'}), 500
 
 def prepare_chart_data(study_sessions):
     chart_data = {
@@ -1953,22 +2052,85 @@ def add_coop_coep(resp):
     return resp
 
 def init_database():
-    """初始化資料庫 - 確保所有表格都已建立"""
+    """初始化資料庫 - 確保所有表格都已建立（強化版）"""
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        try:
+            with app.app_context():
+                # 測試連線
+                db.session.execute('SELECT 1')
+                print('✓ 資料庫連線成功')
+                
+                # 建立所有資料表
+                db.create_all()
+                print('✓ 資料庫初始化完成')
+                
+                # 驗證資料表是否存在
+                inspector = db.inspect(db.engine)
+                tables = inspector.get_table_names()
+                print(f'✓ 資料表清單: {tables}')
+                
+                # 檢查必要的表格
+                required_tables = ['user', 'child', 'study_session', 'emotion_data', 'video_watch']
+                missing_tables = [t for t in required_tables if t not in tables]
+                
+                if missing_tables:
+                    print(f'⚠ 警告：以下表格未建立: {missing_tables}')
+                    raise Exception(f'缺少必要表格: {missing_tables}')
+                
+                print('✓ 所有必要表格已確認存在')
+                return True
+                
+        except OperationalError as e:
+            retry_count += 1
+            print(f'✗ 資料庫初始化失敗 (嘗試 {retry_count}/{max_retries}): {e}')
+            if retry_count < max_retries:
+                import time
+                time.sleep(2)  # 等待 2 秒後重試
+            else:
+                print('✗ 資料庫初始化最終失敗')
+                import traceback
+                traceback.print_exc()
+                return False
+                
+        except Exception as e:
+            print(f'✗ 資料庫初始化失敗: {e}')
+            import traceback
+            traceback.print_exc()
+            return False
+
+# ===== 新增：資料庫健康檢查端點 =====
+@app.route('/health')
+def health_check():
+    """健康檢查端點（用於監控）"""
     try:
-        with app.app_context():
-            # 建立所有資料表
-            db.create_all()
-            print('✓ 資料庫初始化完成')
-            
-            # 驗證資料表是否存在
-            inspector = db.inspect(db.engine)
-            tables = inspector.get_table_names()
-            print(f'✓ 資料表清單: {tables}')
-            
+        # 測試資料庫連線
+        db.session.execute('SELECT 1')
+        
+        # 統計基本資料
+        user_count = User.query.count()
+        child_count = Child.query.count()
+        session_count = StudySession.query.count()
+        
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected',
+            'stats': {
+                'users': user_count,
+                'children': child_count,
+                'sessions': session_count
+            }
+        }), 200
+        
     except Exception as e:
-        print(f'✗ 資料庫初始化失敗: {e}')
-        import traceback
-        traceback.print_exc()
+        print(f'✗ 健康檢查失敗: {e}')
+        return jsonify({
+            'status': 'unhealthy',
+            'database': 'disconnected',
+            'error': str(e)
+        }), 503
 
 # 啟動時初始化資料庫
 init_database()
