@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
+from sqlalchemy import text
 from datetime import datetime, timedelta, timezone
 
 import json
@@ -506,7 +507,7 @@ def before_request():
     """每個請求前確保資料庫連線正常"""
     try:
         # 測試資料庫連線
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))  # ✅ 正確
     except OperationalError as e:
         print(f"✗ 資料庫連線失敗: {e}")
         db.session.rollback()
@@ -2055,7 +2056,7 @@ def init_database():
         try:
             with app.app_context():
                 # 測試連線
-                db.session.execute('SELECT 1')
+                db.session.execute(text('SELECT 1'))
                 print('✓ 資料庫連線成功')
                 
                 # 建立所有資料表
@@ -2102,7 +2103,7 @@ def health_check():
     """健康檢查端點（用於監控）"""
     try:
         # 測試資料庫連線
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         
         # 統計基本資料
         user_count = User.query.count()
