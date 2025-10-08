@@ -2027,11 +2027,6 @@ def create_comprehensive_report(child, study_sessions, ai_suggestion=None):
     doc.build(story)
     return filepath
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('index'))
-
 @app.route('/favicon.ico')
 def favicon():
     static_dir = os.path.join(app.root_path, 'static')
